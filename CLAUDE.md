@@ -35,4 +35,4 @@ dist/            built zips (git-ignored)
 - Profession window must be open for the `recipes` dump. AH must be open for `/lorestar scan` (throttled ~15 min).
 - `GetReplicateItemInfo` indexes start at 0; the positional return order is assumed, verify against `prices.probe`.
 - `TRADE_SKILL_UPDATE` does not exist in Forever. Avoid slash commands `/lm`, `/ls`, `/codex`, `/titan`.
-- Current version: see `Lorestar/Lorestar.toc`. v0.4.1 has passed a syntax check but has not been run in game yet.
+- Current version: see `Lorestar/Lorestar.toc`. v0.4.2 passed a syntax check and a synthetic test of the price logic; not yet run in game (v0.4.1 ran clean on 2026-11-09).

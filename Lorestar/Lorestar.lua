@@ -3,7 +3,7 @@
 
 local ADDON_NAME = ...
 
-local VERSION = "0.4.1"
+local VERSION = "0.4.2"
 local PREFIX = "|cff33ff99Lorestar|r: "
 local MAX_DEPTH = 4
 
@@ -509,7 +509,8 @@ addSection("recipes", function()
     if type(prev) == "table" and type(prev.byProfession) == "table" then
         for k, v in pairs(prev.byProfession) do result.byProfession[k] = v end
     end
-    if out.modern or out.legacy then
+    local hasRows = (out.modern and next(out.modern) ~= nil) or (out.legacy and next(out.legacy) ~= nil)
+    if hasRows then
         local key
         local bp = out.baseProfession
         if type(bp) == "table" and type(bp.professionName) == "string" then
@@ -524,6 +525,7 @@ addSection("recipes", function()
         result.last = key
     else
         result.note = out.note
+            or "Profession window is open but has no recipes (or the window is closed). Nothing saved."
     end
     return result
 end)
@@ -807,10 +809,54 @@ end
 
 -- Manual auction house price scan (/lorestar scan). Read-only: asks the game
 -- for the full replicate list (the game throttles this to roughly once per
--- 15 minutes), then keeps only the lowest unit buyout, listing count and total
--- quantity per itemID. Seller and bidder values are discarded and never stored.
+-- 15 minutes), then keeps per itemID: listing count (n), total quantity (q),
+-- lowest unit buyout (m), and two robust prices weighted by quantity: p10 (unit
+-- price below which the cheapest 10% of units sit) and med (quantity-weighted
+-- median). Seller and bidder values are discarded and never stored.
 local scanFrame = CreateFrame("Frame")
 local scanning = false
+
+-- Computes p10 and med per item (a few hundred items per frame) and stores the result.
+local function finalizePrices(items, total, probe)
+    local keys = {}
+    for id in pairs(items) do keys[#keys + 1] = id end
+    local k = 0
+    local function fin()
+        local last = math.min(k + 199, #keys)
+        for j = k + 1, last do
+            local rec = items[keys[j]]
+            local u, c = rec.u, rec.c
+            rec.u, rec.c = nil, nil
+            local cnt = u and #u or 0
+            if cnt > 0 then
+                local idx = {}
+                for x = 1, cnt do idx[x] = x end
+                table.sort(idx, function(a, b) return u[a] < u[b] end)
+                local totalQ, cum = 0, 0
+                for x = 1, cnt do totalQ = totalQ + c[x] end
+                local p10, med
+                for _, x in ipairs(idx) do
+                    cum = cum + c[x]
+                    if not p10 and cum >= totalQ * 0.10 then p10 = u[x] end
+                    if not med and cum >= totalQ * 0.50 then med = u[x] break end
+                end
+                rec.p10, rec.med = p10, med
+            end
+        end
+        k = last
+        if k < #keys then
+            C_Timer.After(0, fin)
+        else
+            LorestarDB.prices = {
+                time = date("%Y-%m-%d %H:%M:%S"), rows = total, distinct = #keys,
+                probe = probe, items = items, schema = 2,
+            }
+            scanning = false
+            say("Scan done: " .. total .. " listings, " .. #keys .. " distinct items. Type /reload to write the file.")
+        end
+    end
+    fin()
+end
 
 local function processReplicate()
     local db = LorestarDB
@@ -830,7 +876,7 @@ local function processReplicate()
                     and type(count) == "number" and not isSecret(count) and count > 0 then
                     local rec = items[itemID]
                     if not rec then
-                        rec = { n = 0, q = 0 }
+                        rec = { n = 0, q = 0, u = {}, c = {} }
                         items[itemID] = rec
                     end
                     rec.n = rec.n + 1
@@ -838,6 +884,8 @@ local function processReplicate()
                     if buyout > 0 then
                         local unit = math.floor(buyout / count)
                         if not rec.m or unit < rec.m then rec.m = unit end
+                        rec.u[#rec.u + 1] = unit
+                        rec.c[#rec.c + 1] = count
                     end
                 end
             end
@@ -846,11 +894,7 @@ local function processReplicate()
         if i < total then
             C_Timer.After(0, step)
         else
-            local n = 0
-            for _ in pairs(items) do n = n + 1 end
-            db.prices = { time = date("%Y-%m-%d %H:%M:%S"), rows = total, distinct = n, probe = probe, items = items }
-            scanning = false
-            say("Scan done: " .. total .. " listings, " .. n .. " distinct items. Type /reload to write the file.")
+            finalizePrices(items, total, probe)
         end
     end
     if total == 0 then
