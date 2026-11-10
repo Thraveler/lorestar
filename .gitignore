@@ -1,0 +1,8 @@
+# Real in-game dumps stay local until privacy-scanned
+data/runs/*
+!data/runs/.gitkeep
+parsed.json
+# Build output
+dist/*
+!dist/.gitkeep
+.DS_Store
