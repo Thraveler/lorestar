@@ -3,7 +3,7 @@
 
 local ADDON_NAME = ...
 
-local VERSION = "0.4.2"
+local VERSION = "0.4.3"
 local PREFIX = "|cff33ff99Lorestar|r: "
 local MAX_DEPTH = 4
 
@@ -507,7 +507,14 @@ addSection("recipes", function()
         and LorestarDB.snapshot.sections.recipes
     local result = { byProfession = {} }
     if type(prev) == "table" and type(prev.byProfession) == "table" then
-        for k, v in pairs(prev.byProfession) do result.byProfession[k] = v end
+        -- Skip empty keys and entries without rows: v0.4.1 could save an empty
+        -- entry under '' and it would otherwise be carried forward forever.
+        for k, v in pairs(prev.byProfession) do
+            if k ~= "" and type(v) == "table" and ((v.modern and next(v.modern) ~= nil)
+                or (v.legacy and next(v.legacy) ~= nil)) then
+                result.byProfession[k] = v
+            end
+        end
     end
     local hasRows = (out.modern and next(out.modern) ~= nil) or (out.legacy and next(out.legacy) ~= nil)
     if hasRows then
