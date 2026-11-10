@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors — western/frontier palette, same as portfolio-web */
+  --color-bg: #0c0002;
+  --color-surface: #1c1410;
+  --color-surface-hover: #251a14;
+  --color-accent-red: #c90511;
+  --color-accent-red-hover: #e0061a;
+  --color-accent-gold: #f2a92c;
+  --color-text: #efe1bd;
+  --color-text-muted: #c8b19d;
+  --color-border: #2e1f18;
+
+  /* Item quality — PLACEHOLDER (official WoW hues, adjusted for contrast on --color-bg).
+     Pending decision: official vs. ad hoc vs. hybrid. Change only these values. */
+  --color-quality-0: #9d9d9d; /* poor */
+  --color-quality-1: #efe1bd; /* common (palette parchment instead of pure white) */
+  --color-quality-2: #1eff00; /* uncommon */
+  --color-quality-3: #0070dd; /* rare */
+  --color-quality-4: #a335ee; /* epic */
+  --color-quality-5: #ff8000; /* legendary */
+
+  /* Typography */
+  --font-display: 'Rye', serif;
+  --font-heading: 'Bitter', serif;
+  --font-body: 'Lora', serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    /* Grain texture overlay */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+
+  ::selection {
+    background-color: var(--color-accent-red);
+    color: var(--color-text);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-accent-gold);
+  }
+}
+
+/* Table pattern (new in lorestar; to be documented in the visual design system) */
+@layer components {
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .data-table th {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .data-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .data-table tbody tr:hover {
+    background-color: var(--color-surface-hover);
+  }
+}

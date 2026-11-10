@@ -1,0 +1,74 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SectionHeader from '../components/ui/SectionHeader.astro';
+import { openDb, listRuns, DB_PATH } from '../lib/db';
+import { nf } from '../lib/format';
+
+const db = openDb();
+const runs = db ? listRuns(db) : [];
+db?.close();
+const latest = runs[0];
+---
+
+<Layout title="Runs">
+  <main class="mx-auto max-w-5xl px-6 pt-32 pb-24">
+    <SectionHeader
+      title="Runs"
+      subtitle="Each run is one in-game session ingested from the addon's SavedVariables."
+    />
+
+    {!latest ? (
+      <div class="rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6 opacity-60">
+        <p class="font-heading text-xs tracking-widest uppercase text-[var(--color-text-muted)]">No data</p>
+        <p class="mt-2">
+          No database at <code>{DB_PATH}</code>. Run <code>scripts/new-run.sh &lt;SavedVariables file&gt;</code> first.
+        </p>
+      </div>
+    ) : (
+      <>
+        <section class="mb-12 grid grid-cols-2 gap-6 md:grid-cols-4">
+          {[
+            ['Latest run', latest.label],
+            ['Bag slots', `${latest.bag_used ?? '—'} / ${latest.bag_slots ?? '—'}`],
+            ['Recipes learned', `${nf.format(latest.learned)} / ${nf.format(latest.recipes)}`],
+            ['AH items priced', nf.format(latest.prices)],
+          ].map(([label, value]) => (
+            <div class="flex flex-col gap-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-6 transition-colors duration-200 hover:border-[var(--color-accent-gold)]">
+              <span class="font-heading text-xs tracking-widest uppercase text-[var(--color-text-muted)]">{label}</span>
+              <span class="font-heading text-lg font-semibold break-words">{value}</span>
+            </div>
+          ))}
+        </section>
+
+        <div class="overflow-x-auto rounded border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Run</th>
+                <th>Addon</th>
+                <th>Snapshot</th>
+                <th>Scan</th>
+                <th class="text-right">Listings</th>
+                <th class="text-right">Priced</th>
+                <th class="text-right">Errors</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((r) => (
+                <tr>
+                  <td class="font-heading">{r.label}</td>
+                  <td>v{r.addon_version}</td>
+                  <td>{r.snapshot_time}</td>
+                  <td>{r.scan_time ?? '—'}</td>
+                  <td class="text-right">{nf.format(r.scan_rows ?? 0)}</td>
+                  <td class="text-right">{nf.format(r.prices)}</td>
+                  <td class="text-right">{r.section_errors}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    )}
+  </main>
+</Layout>

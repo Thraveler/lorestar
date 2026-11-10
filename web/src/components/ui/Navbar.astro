@@ -1,0 +1,51 @@
+---
+const currentPath = Astro.url.pathname;
+
+const links = [{ label: 'Runs', href: '/' }];
+---
+
+<header id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300">
+  <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+    <a
+      href="/"
+      class="font-display text-sm text-[var(--color-accent-gold)] tracking-widest transition-opacity hover:opacity-75"
+    >
+      lorestar
+    </a>
+
+    <ul class="flex items-center gap-8">
+      {links.map(({ label, href }) => (
+        <li>
+          <a
+            href={href}
+            class:list={[
+              'font-heading text-xs tracking-widest uppercase transition-colors',
+              (href === '/' ? currentPath === '/' : currentPath.startsWith(href))
+                ? 'text-[var(--color-accent-gold)]'
+                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
+            ]}
+          >
+            {label}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</header>
+
+<script>
+  const navbar = document.getElementById('navbar')!;
+  function updateBackground() {
+    navbar.classList.toggle('nav-scrolled', window.scrollY > 80);
+  }
+  window.addEventListener('scroll', updateBackground, { passive: true });
+  updateBackground();
+</script>
+
+<style>
+  #navbar.nav-scrolled {
+    background-color: color-mix(in srgb, var(--color-bg) 90%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--color-border);
+  }
+</style>
