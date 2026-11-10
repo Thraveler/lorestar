@@ -3,7 +3,7 @@
 
 local ADDON_NAME = ...
 
-local VERSION = "0.4.0"
+local VERSION = "0.4.1"
 local PREFIX = "|cff33ff99Lorestar|r: "
 local MAX_DEPTH = 4
 
@@ -498,7 +498,34 @@ addSection("recipes", function()
     if not (out.modern or out.legacy) then
         out.note = "No recipe data. Open a profession window (for example Blacksmithing) and run this section again."
     end
-    return out
+
+    -- v0.4.1: keep one entry per profession, so several profession windows can be
+    -- dumped one after another and written to disk with a single /reload.
+    -- Entries from earlier dumps are carried forward, so a later dump with the
+    -- window closed no longer wipes them.
+    local prev = LorestarDB and LorestarDB.snapshot and LorestarDB.snapshot.sections
+        and LorestarDB.snapshot.sections.recipes
+    local result = { byProfession = {} }
+    if type(prev) == "table" and type(prev.byProfession) == "table" then
+        for k, v in pairs(prev.byProfession) do result.byProfession[k] = v end
+    end
+    if out.modern or out.legacy then
+        local key
+        local bp = out.baseProfession
+        if type(bp) == "table" and type(bp.professionName) == "string" then
+            key = bp.professionName
+        end
+        if not key then
+            -- Name unavailable: fall back to the first recipe ID, which differs per profession.
+            local first = out.modern and out.modern[1]
+            key = "recipe-set-" .. tostring(first and first.id or "legacy")
+        end
+        result.byProfession[key] = out
+        result.last = key
+    else
+        result.note = out.note
+    end
+    return result
 end)
 
 -- Which auction house functions exist, and a few state checks. Prices are not
@@ -623,6 +650,8 @@ local function runDump(only)
     local recipesSection = snap.sections.recipes
     if recipesSection and recipesSection.note then
         say("recipes: " .. recipesSection.note)
+    elseif recipesSection and recipesSection.last then
+        say("recipes: saved '" .. tostring(recipesSection.last) .. "'")
     end
 end
 

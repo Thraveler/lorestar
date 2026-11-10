@@ -15,7 +15,7 @@ network access.
    Forever's `Interface/AddOns/` directory. The folder must be named exactly `Lorestar`.
 2. If you used the old ForeverProbe, delete its folder first. You can also delete
    `ForeverProbe.lua` in `WTF/Account/<account>/SavedVariables/`.
-3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.0`.
+3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.1`.
 
 ## Commands
 
@@ -53,6 +53,10 @@ After any command, `/reload` (or logging out) writes the data to disk.
    material such as ore, and a piece of gear). Also loot, mine, craft and visit a vendor.
    Then `/lorestar events off`.
 5. `/reload`.
+
+## What's new in 0.4.1
+
+- `recipes` is now stored per profession (`recipes.byProfession[<name>]`). Open each profession window and run `/lorestar dump recipes`; one `/reload` at the end writes them all. A later dump with the window closed no longer wipes earlier recipes.
 
 ## What's new in 0.4.0
 
