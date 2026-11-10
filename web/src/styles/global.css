@@ -12,14 +12,6 @@
   --color-text-muted: #c8b19d;
   --color-border: #2e1f18;
 
-  /* Item quality — PLACEHOLDER (official WoW hues, adjusted for contrast on --color-bg).
-     Pending decision: official vs. ad hoc vs. hybrid. Change only these values. */
-  --color-quality-0: #9d9d9d; /* poor */
-  --color-quality-1: #efe1bd; /* common (palette parchment instead of pure white) */
-  --color-quality-2: #1eff00; /* uncommon */
-  --color-quality-3: #0070dd; /* rare */
-  --color-quality-4: #a335ee; /* epic */
-  --color-quality-5: #ff8000; /* legendary */
 
   /* Typography */
   --font-display: 'Rye', serif;
@@ -78,10 +70,41 @@
     border-bottom: 1px solid var(--color-border);
   }
   .data-table td {
+    white-space: nowrap;
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--color-border);
   }
   .data-table tbody tr:hover {
     background-color: var(--color-surface-hover);
   }
+}
+
+/* Item quality colors. Plain :root (not @theme) because Tailwind drops unused @theme variables.
+   Default = "hybrid"; "official" and "earth" are selectable with data-quality on <html>.
+   Pending decision: official vs. earth vs. hybrid. */
+:root {
+  --color-quality-0: #9a948c; /* poor */
+  --color-quality-1: #efe1bd; /* common */
+  --color-quality-2: #6fbf5a; /* uncommon */
+  --color-quality-3: #4a8fd6; /* rare */
+  --color-quality-4: #b06ad6; /* epic */
+  --color-quality-5: #e8872a; /* legendary */
+}
+
+/* Quality color sets. Only these values change between themes. */
+:root[data-quality='official'] {
+  --color-quality-0: #9d9d9d;
+  --color-quality-1: #ffffff;
+  --color-quality-2: #1eff00;
+  --color-quality-3: #0070dd;
+  --color-quality-4: #a335ee;
+  --color-quality-5: #ff8000;
+}
+:root[data-quality='earth'] {
+  --color-quality-0: #8a7d70;
+  --color-quality-1: #efe1bd;
+  --color-quality-2: #8fa05a;
+  --color-quality-3: #6f93a8;
+  --color-quality-4: #a0627f;
+  --color-quality-5: #d9742a;
 }

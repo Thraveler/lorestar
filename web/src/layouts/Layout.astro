@@ -27,6 +27,13 @@ const { title = 'lorestar', description = 'Bag and profession advisor for WoW Fo
       rel="stylesheet"
     />
 
+    <script is:inline>
+      try {
+        var q = localStorage.getItem('lorestar-quality');
+        if (q) document.documentElement.dataset.quality = q;
+      } catch (e) {}
+    </script>
+
     <title>{title === 'lorestar' ? 'lorestar' : `${title} — lorestar`}</title>
   </head>
   <body>

@@ -42,3 +42,31 @@ export function listRuns(db: DatabaseSync): RunSummary[] {
     )
     .all() as unknown as RunSummary[];
 }
+
+export interface BagRow {
+  item_id: number;
+  name: string | null;
+  quality: number | null;
+  qty: number;
+  vendor: number | null;
+  listings: number | null;
+  m: number | null;
+  p10: number | null;
+  med: number | null;
+  learned_recipes: number;
+  unlearned_recipes: number;
+  is_reagent: number | null;
+  type: string | null;
+}
+
+export function bagRows(db: DatabaseSync, runId: number): BagRow[] {
+  const rows = db
+    .prepare(
+      `SELECT v.item_id, v.name, v.quality, v.qty, v.vendor, v.listings, v.m, v.p10, v.med,
+              v.learned_recipes, v.unlearned_recipes, i.is_reagent, i.type
+       FROM v_bag_advice v LEFT JOIN items i ON i.item_id = v.item_id
+       WHERE v.run_id = ? ORDER BY v.name`,
+    )
+    .all(runId);
+  return rows.map((r) => ({ ...r })) as unknown as BagRow[];
+}

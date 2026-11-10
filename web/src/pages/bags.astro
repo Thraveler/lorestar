@@ -1,0 +1,57 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SectionHeader from '../components/ui/SectionHeader.astro';
+import BagsTable from '../components/BagsTable';
+import QualityTheme from '../components/QualityTheme';
+import { openDb, listRuns, bagRows } from '../lib/db';
+
+const db = openDb();
+const runs = db ? listRuns(db) : [];
+const wanted = Astro.url.searchParams.get('run');
+const run = runs.find((r) => r.label === wanted) ?? runs[0];
+const rows = db && run ? bagRows(db, run.id) : [];
+db?.close();
+---
+
+<Layout title="Bags">
+  <main class="mx-auto max-w-6xl px-6 pt-32 pb-24">
+    <SectionHeader
+      title="Bags"
+      subtitle="What is in your bags, with vendor price, Auction House prices and the recipes that use each item."
+    />
+
+    {!run ? (
+      <div class="rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6 opacity-60">
+        No runs yet. Run <code>scripts/new-run.sh &lt;SavedVariables file&gt;</code> first.
+      </div>
+    ) : (
+      <>
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <label class="flex items-center gap-2 font-heading text-xs tracking-widest uppercase text-[var(--color-text-muted)]">
+            Run
+            <select
+              id="run-select"
+              class="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[var(--color-text)]"
+            >
+              {runs.map((r) => (
+                <option value={r.label} selected={r.id === run.id}>{r.label}</option>
+              ))}
+            </select>
+          </label>
+          <span class="font-heading text-xs tracking-widest uppercase text-[var(--color-text-muted)]">
+            Bag slots {run.bag_used ?? '—'} / {run.bag_slots ?? '—'} · scan {run.scan_time ?? '—'}
+          </span>
+          <QualityTheme client:load />
+        </div>
+        <BagsTable client:load rows={rows} />
+      </>
+    )}
+  </main>
+</Layout>
+
+<script>
+  document.getElementById('run-select')?.addEventListener('change', (e) => {
+    const label = (e.target as HTMLSelectElement).value;
+    window.location.search = `?run=${encodeURIComponent(label)}`;
+  });
+</script>
