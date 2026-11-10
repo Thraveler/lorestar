@@ -6,3 +6,10 @@ parsed.json
 dist/*
 !dist/.gitkeep
 .DS_Store
+
+# Local database and web viewer
+data/lorestar.db
+data/lorestar.db-*
+web/node_modules/
+web/dist/
+web/.astro/
