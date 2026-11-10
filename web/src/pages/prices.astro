@@ -1,0 +1,73 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SectionHeader from '../components/ui/SectionHeader.astro';
+import PricesTable from '../components/PricesTable';
+import { openDb, listRuns, priceHistory, type PriceScope } from '../lib/db';
+
+const SCOPES: { id: PriceScope; label: string }[] = [
+  { id: 'bags', label: 'Items in my bags' },
+  { id: 'reagents', label: 'Reagents of any recipe' },
+  { id: 'all', label: 'Everything priced' },
+];
+
+const db = openDb();
+const runs = db ? listRuns(db) : [];
+const asked = Astro.url.searchParams.get('scope');
+const scope: PriceScope = SCOPES.some((s) => s.id === asked) ? (asked as PriceScope) : 'bags';
+const items = db ? priceHistory(db, scope) : [];
+db?.close();
+const priced = runs.filter((r) => r.scan_time);
+---
+
+<Layout title="Prices">
+  <main class="mx-auto max-w-6xl px-6 pt-32 pb-24">
+    <SectionHeader
+      title="Prices"
+      subtitle="Auction House prices per item across runs: lowest buyout, p10 (cheapest 10% of units) and median."
+    />
+
+    {!runs.length ? (
+      <div class="rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6 opacity-60">
+        No runs yet. Run <code>scripts/new-run.sh &lt;SavedVariables file&gt;</code> first.
+      </div>
+    ) : (
+      <>
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <label class="flex items-center gap-2 font-heading text-xs tracking-widest uppercase text-[var(--color-text-muted)]">
+            Scope
+            <select
+              id="scope-select"
+              class="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[var(--color-text)]"
+            >
+              {SCOPES.map((s) => (
+                <option value={s.id} selected={s.id === scope}>{s.label}</option>
+              ))}
+            </select>
+          </label>
+          <span class="font-heading text-xs tracking-widest uppercase text-[var(--color-text-muted)]">
+            {priced.length} {priced.length === 1 ? 'scan' : 'scans'} · latest {priced[0]?.scan_time ?? '—'}
+          </span>
+        </div>
+
+        {priced.length < 2 && (
+          <p class="mb-6 rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-muted)]">
+            Only one scan so far, so there is no trend to show. Run another scan at a different time of day.
+          </p>
+        )}
+
+        <PricesTable client:load items={items} />
+        <p class="mt-4 text-sm text-[var(--color-text-muted)]">
+          Click an item to see its history. Points are evenly spaced, not proportional to time. Prices are per unit; the game limits
+          scans to about one every 15 minutes, so runs taken close together will look almost identical. Names are only known for
+          items that were in your bags; the rest show as an item ID.
+        </p>
+      </>
+    )}
+  </main>
+</Layout>
+
+<script>
+  document.getElementById('scope-select')?.addEventListener('change', (e) => {
+    window.location.search = `?scope=${(e.target as HTMLSelectElement).value}`;
+  });
+</script>
