@@ -16,7 +16,8 @@ Bag / inventory advisor addon for **WoW Forever** (Midnight Retail client, inter
 
 ## Layout
 ```
-Lorestar/        the addon (folder name must match Lorestar.toc exactly)
+Lorestar/        the addon (folder name must match Lorestar.toc exactly): Lorestar.lua (core, slash commands),
+                 Lorestar_UI.lua (minimap button + panel, built under pcall; core exposes ns.actions)
 tools/           analyze.py: Lua SavedVariables -> JSON parser
 tools/ingest.py  parsed.json -> SQLite (schema in tools/schema.sql)
 scripts/         build.sh (zip into dist/), new-run.sh (store + parse + ingest one in-game run)
@@ -37,4 +38,4 @@ dist/            built zips (git-ignored)
 - Profession window must be open for the `recipes` dump. AH must be open for `/lorestar scan` (throttled ~15 min).
 - `GetReplicateItemInfo` indexes start at 0; the positional return order is assumed, verify against `prices.probe`.
 - `TRADE_SKILL_UPDATE` does not exist in Forever. Avoid slash commands `/lm`, `/ls`, `/codex`, `/titan`.
-- Current version: see `Lorestar/Lorestar.toc`. v0.4.2 ran clean in game on 2026-11-09; v0.4.3 passed a syntax check and a synthetic test, not yet run in game.
+- Current version: see `Lorestar/Lorestar.toc`. v0.4.2 ran clean in game on 2026-11-09; v0.4.4 and v0.4.5 passed syntax checks and simulated tests, not yet run in game.

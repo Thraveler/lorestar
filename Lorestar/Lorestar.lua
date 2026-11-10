@@ -1,9 +1,9 @@
 -- Lorestar: explores which APIs and data are available to addons in WoW Forever.
 -- Everything is written to the SavedVariables file Lorestar.lua (flushed on /reload or logout).
 
-local ADDON_NAME = ...
+local ADDON_NAME, ns = ...
 
-local VERSION = "0.4.4"
+local VERSION = "0.4.5"
 local PREFIX = "|cff33ff99Lorestar|r: "
 local MAX_DEPTH = 4
 
@@ -1064,11 +1064,46 @@ local function showHelp()
     say("  /lorestar events on|off    track events and sample auction house results you search")
     say("  /lorestar scan             with the auction house open, record lowest buyout per item")
     say("  /lorestar anon on|off      hide (default) or include name, realm, gold and event text")
+    say("  /lorestar ui               open the panel (also: click the minimap button)")
+    say("  /lorestar minimap show|hide  show or hide the minimap button")
     say("  /lorestar status           show what is recorded")
     say("  /lorestar clear            wipe everything recorded")
     say("Open a profession window before dumping 'recipes'.")
     say("After any command, /reload writes the data to SavedVariables.")
 end
+
+-- Actions shared by the slash commands and the UI panel (Lorestar_UI.lua).
+local function setAnon(on)
+    LorestarDB.anonymous = on and true or false
+    if on then
+        say("Anonymous mode ON: name, realm, gold and event text samples are hidden.")
+    else
+        say("Anonymous mode OFF: new dumps will include name, realm, gold and event text. Clear first to remove older data.")
+    end
+end
+
+local function clearAll()
+    setEvents(false)
+    LorestarDB.snapshot = nil
+    LorestarDB.api = nil
+    LorestarDB.events = {}
+    LorestarDB.eventStatus = {}
+    LorestarDB.auctionSamples = nil
+    LorestarDB.prices = nil
+    say("Cleared. Type /reload to write the empty file.")
+end
+
+ns.actions = {
+    version = VERSION,
+    say = say,
+    isAnon = isAnon,
+    dump = runDump,
+    events = setEvents,
+    scan = runScan,
+    setAnon = setAnon,
+    clear = clearAll,
+    isScanning = function() return scanning end,
+}
 
 SLASH_LORESTAR1 = "/lorestar"
 SlashCmdList["LORESTAR"] = function(msg)
@@ -1094,25 +1129,24 @@ SlashCmdList["LORESTAR"] = function(msg)
         runScan()
     elseif cmd == "anon" then
         if rest == "on" then
-            LorestarDB.anonymous = true
-            say("Anonymous mode ON: name, realm, gold and event text samples are hidden.")
+            setAnon(true)
         elseif rest == "off" then
-            LorestarDB.anonymous = false
-            say("Anonymous mode OFF: new dumps will include name, realm, gold and event text. Run /lorestar clear first to remove older data.")
+            setAnon(false)
         else
             say("Anonymous mode is " .. (isAnon() and "ON" or "OFF") .. ". Usage: /lorestar anon on|off")
         end
     elseif cmd == "status" then
         showStatus()
     elseif cmd == "clear" then
-        setEvents(false)
-        LorestarDB.snapshot = nil
-        LorestarDB.api = nil
-        LorestarDB.events = {}
-        LorestarDB.eventStatus = {}
-        LorestarDB.auctionSamples = nil
-        LorestarDB.prices = nil
-        say("Cleared. Type /reload to write the empty file.")
+        clearAll()
+    elseif cmd == "ui" then
+        if ns.togglePanel then ns.togglePanel() else say("The UI panel is not available.") end
+    elseif cmd == "minimap" then
+        if ns.setMinimapShown and (rest == "show" or rest == "hide") then
+            ns.setMinimapShown(rest == "show")
+        else
+            say("Usage: /lorestar minimap show|hide")
+        end
     else
         showHelp()
     end
