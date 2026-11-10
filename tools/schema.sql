@@ -79,6 +79,7 @@ CREATE INDEX IF NOT EXISTS idx_reagents_item ON recipe_reagents(item_id);
 CREATE INDEX IF NOT EXISTS idx_recipes_profession ON recipes(run_id, profession);
 
 -- Bags with vendor price, AH prices and how many recipes use each item.
+-- AH prices come from the run's own scan, or else the latest earlier one.
 DROP VIEW IF EXISTS v_bag_advice;
 CREATE VIEW v_bag_advice AS
 SELECT b.run_id, b.item_id, i.name, i.quality, b.qty, i.vendor_sell_price AS vendor,
@@ -91,4 +92,6 @@ SELECT b.run_id, b.item_id, i.name, i.quality, b.qty, i.vendor_sell_price AS ven
         WHERE rr.run_id = b.run_id AND rr.item_id = b.item_id AND r.learned = 0) AS unlearned_recipes
 FROM bag_items b
 LEFT JOIN items i ON i.item_id = b.item_id
-LEFT JOIN prices p ON p.run_id = b.run_id AND p.item_id = b.item_id;
+LEFT JOIN prices p ON p.item_id = b.item_id
+   -- A run without a scan uses the most recent scan taken at or before it.
+   AND p.run_id = (SELECT MAX(r2.id) FROM runs r2 WHERE r2.id <= b.run_id AND r2.scan_time IS NOT NULL);

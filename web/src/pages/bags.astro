@@ -3,13 +3,14 @@ import Layout from '../layouts/Layout.astro';
 import SectionHeader from '../components/ui/SectionHeader.astro';
 import BagsTable from '../components/BagsTable';
 import QualityTheme from '../components/QualityTheme';
-import { openDb, listRuns, bagRows } from '../lib/db';
+import { openDb, listRuns, bagRows, priceSourceFor } from '../lib/db';
 
 const db = openDb();
 const runs = db ? listRuns(db) : [];
 const wanted = Astro.url.searchParams.get('run');
 const run = runs.find((r) => r.label === wanted) ?? runs[0];
 const rows = db && run ? bagRows(db, run.id) : [];
+const priceSrc = db && run ? priceSourceFor(db, run.id) : null;
 db?.close();
 ---
 
@@ -43,6 +44,16 @@ db?.close();
           </span>
           <QualityTheme client:load />
         </div>
+        {priceSrc && priceSrc.id !== run.id && (
+          <p class="mb-6 rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-muted)]">
+            This run has no Auction House scan. AH prices shown come from the scan of <span class="text-[var(--color-text)]">{priceSrc.label}</span> ({priceSrc.scan_time}).
+          </p>
+        )}
+        {!priceSrc && (
+          <p class="mb-6 rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-muted)]">
+            No Auction House scan has been ingested yet, so there are no AH prices.
+          </p>
+        )}
         <BagsTable client:load rows={rows} />
       </>
     )}

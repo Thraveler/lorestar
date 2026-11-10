@@ -15,7 +15,7 @@ network access.
    Forever's `Interface/AddOns/` directory. The folder must be named exactly `Lorestar`.
 2. If you used the old ForeverProbe, delete its folder first. You can also delete
    `ForeverProbe.lua` in `WTF/Account/<account>/SavedVariables/`.
-3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.5`.
+3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.6`.
 
 ## Commands
 
@@ -56,9 +56,13 @@ After any command, `/reload` (or logging out) writes the data to disk.
    Then `/lorestar events off`.
 5. `/reload`.
 
+## What's new in 0.4.6
+
+- The minimap button now uses a book icon instead of the letter "L", which looked blurry.
+
 ## What's new in 0.4.5
 
-- **UI panel.** A small **L** button appears on the minimap (drag it around the minimap; the position is remembered). Click it, or type `/lorestar ui`, to open a panel with buttons for the same actions as the commands: Dump all, Dump items, Dump recipes, Dump item names, Scan AH prices, Events on/off, Anonymous on/off, Reload UI (this is what writes the data to disk) and Clear data (click twice within 5 seconds to confirm). A status area shows the last dump and scan, pending item names, and whether the Auction House and profession windows are open.
+- **UI panel.** A small book button appears on the minimap (drag it around the minimap; the position is remembered). Click it, or type `/lorestar ui`, to open a panel with buttons for the same actions as the commands: Dump all, Dump items, Dump recipes, Dump item names, Scan AH prices, Events on/off, Anonymous on/off, Reload UI (this is what writes the data to disk) and Clear data (click twice within 5 seconds to confirm). A status area shows the last dump and scan, pending item names, and whether the Auction House and profession windows are open.
 - `/lorestar minimap show|hide` shows or hides the button. The slash commands keep working.
 - The UI lives in `Lorestar_UI.lua` and is built inside a protected call: if it fails, the addon prints a message and keeps working through commands.
 - The panel cannot open a profession window for you; open it yourself, then click Dump recipes.

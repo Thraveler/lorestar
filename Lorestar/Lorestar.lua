@@ -3,7 +3,7 @@
 
 local ADDON_NAME, ns = ...
 
-local VERSION = "0.4.5"
+local VERSION = "0.4.6"
 local PREFIX = "|cff33ff99Lorestar|r: "
 local MAX_DEPTH = 4
 

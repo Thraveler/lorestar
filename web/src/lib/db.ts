@@ -30,6 +30,20 @@ export interface RunSummary extends Run {
   prices: number;
 }
 
+export interface PriceSource {
+  id: number;
+  label: string;
+  scan_time: string | null;
+}
+
+// The scan whose prices apply to a run: its own, or the most recent earlier one.
+export function priceSourceFor(db: DatabaseSync, runId: number): PriceSource | null {
+  const row = db
+    .prepare('SELECT id, label, scan_time FROM runs WHERE id <= ? AND scan_time IS NOT NULL ORDER BY id DESC LIMIT 1')
+    .get(runId) as PriceSource | undefined;
+  return row ? { ...row } : null;
+}
+
 export function listRuns(db: DatabaseSync): RunSummary[] {
   return db
     .prepare(
@@ -101,16 +115,17 @@ export interface ProfessionSummary {
 }
 
 export function recipeRows(db: DatabaseSync, runId: number): RecipeRow[] {
+  const priceRun = priceSourceFor(db, runId)?.id ?? -1;
   const recipes = db
     .prepare(
       `SELECT r.recipe_id, r.profession, r.name, COALESCE(r.learned, 0) AS learned, r.output_item_id,
               o.name AS out_name, p.med AS out_med, p.n AS out_listings
        FROM recipes r
-       LEFT JOIN prices p ON p.run_id = r.run_id AND p.item_id = r.output_item_id
+       LEFT JOIN prices p ON p.run_id = :pr AND p.item_id = r.output_item_id
        LEFT JOIN items o ON o.item_id = r.output_item_id
-       WHERE r.run_id = ? ORDER BY r.profession, r.name`,
+       WHERE r.run_id = :runId ORDER BY r.profession, r.name`,
     )
-    .all(runId) as unknown as Omit<RecipeRow, 'reagents'>[];
+    .all({ runId, pr: priceRun }) as unknown as Omit<RecipeRow, 'reagents'>[];
   const reagents = db
     .prepare(
       `SELECT rr.recipe_id, rr.item_id, rr.qty, i.name, COALESCE(b.qty, 0) AS have,
@@ -118,10 +133,10 @@ export function recipeRows(db: DatabaseSync, runId: number): RecipeRow[] {
        FROM recipe_reagents rr
        LEFT JOIN items i ON i.item_id = rr.item_id
        LEFT JOIN bag_items b ON b.run_id = rr.run_id AND b.item_id = rr.item_id
-       LEFT JOIN prices p ON p.run_id = rr.run_id AND p.item_id = rr.item_id
-       WHERE rr.run_id = ?`,
+       LEFT JOIN prices p ON p.run_id = :pr AND p.item_id = rr.item_id
+       WHERE rr.run_id = :runId`,
     )
-    .all(runId) as unknown as (Reagent & { recipe_id: number })[];
+    .all({ runId, pr: priceRun }) as unknown as (Reagent & { recipe_id: number })[];
   const byRecipe = new Map<number, Reagent[]>();
   for (const { recipe_id, ...rest } of reagents) {
     const list = byRecipe.get(recipe_id) ?? [];
@@ -166,12 +181,14 @@ export interface PriceSeries {
 export function priceHistory(db: DatabaseSync, scope: PriceScope): PriceSeries[] {
   const latest = db.prepare('SELECT id FROM runs ORDER BY id DESC LIMIT 1').get() as { id: number } | undefined;
   if (!latest) return [];
+  const scanned = db.prepare('SELECT id FROM runs WHERE scan_time IS NOT NULL ORDER BY id DESC LIMIT 1').get() as { id: number } | undefined;
+  if (!scanned) return [];
   const filter =
     scope === 'bags'
       ? 'p.item_id IN (SELECT item_id FROM bag_items WHERE run_id = :latest)'
       : scope === 'reagents'
         ? 'p.item_id IN (SELECT item_id FROM recipe_reagents WHERE run_id = :latest)'
-        : 'p.item_id IN (SELECT item_id FROM prices WHERE run_id = :latest)';
+        : 'p.item_id IN (SELECT item_id FROM prices WHERE run_id = :scanned)';
   const rows = db
     .prepare(
       `SELECT p.item_id, i.name, i.vendor_sell_price AS vendor, r.label, r.scan_time AS time,
@@ -183,7 +200,7 @@ export function priceHistory(db: DatabaseSync, scope: PriceScope): PriceSeries[]
        WHERE ${filter}
        ORDER BY p.item_id, r.id`,
     )
-    .all({ latest: latest.id }) as unknown as (PricePoint & { item_id: number; name: string | null; vendor: number | null; qty: number })[];
+    .all(scope === 'all' ? { latest: latest.id, scanned: scanned.id } : { latest: latest.id }) as unknown as (PricePoint & { item_id: number; name: string | null; vendor: number | null; qty: number })[];
   const byItem = new Map<number, PriceSeries>();
   for (const { item_id, name, vendor, qty, ...point } of rows) {
     let entry = byItem.get(item_id);
