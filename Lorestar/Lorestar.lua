@@ -3,7 +3,7 @@
 
 local ADDON_NAME = ...
 
-local VERSION = "0.4.3"
+local VERSION = "0.4.4"
 local PREFIX = "|cff33ff99Lorestar|r: "
 local MAX_DEPTH = 4
 
@@ -103,6 +103,9 @@ end
 -- Data sections (each one runs in its own pcall, so one failure never
 -- breaks the others)
 ---------------------------------------------------------------------------
+
+-- Snapshot being built by the current /lorestar dump (lets later sections read earlier ones).
+local activeSnap = nil
 
 local sections = {}
 local function addSection(name, fn)
@@ -537,6 +540,100 @@ addSection("recipes", function()
     return result
 end)
 
+-- v0.4.4: names for every item that appears in a dumped recipe (reagents and
+-- crafted outputs), not only for items in the bags. Run it after `dump recipes`.
+-- Names the client has not cached yet are requested and re-read a few seconds later.
+local MAX_NAME_IDS = 2000
+
+local function collectRecipeItemIDs(recipes)
+    local seen, ids = {}, {}
+    local function add(id)
+        if type(id) == "number" and not seen[id] then
+            seen[id] = true
+            ids[#ids + 1] = id
+        end
+    end
+    local byProfession = type(recipes) == "table" and recipes.byProfession
+    if type(byProfession) ~= "table" then return ids end
+    for _, entry in pairs(byProfession) do
+        if type(entry) == "table" and type(entry.modern) == "table" then
+            for _, row in pairs(entry.modern) do
+                if type(row) == "table" then
+                    add(row.outputItemID)
+                    if type(row.reagents) == "table" then
+                        for _, reagent in pairs(row.reagents) do
+                            if type(reagent) == "table" then add(reagent.itemID) end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    table.sort(ids)
+    return ids
+end
+
+-- Reads names into `store` ([itemID] = { n = name, q = quality, s = sellPrice }); returns how many are still pending.
+local function resolveItemNames(ids, store)
+    local pending = 0
+    for _, id in ipairs(ids) do
+        if not store[id] then
+            local ok, name, _, quality, _, _, _, _, _, _, _, sell = pcall(C_Item.GetItemInfo, id)
+            if ok and type(name) == "string" and not isSecret(name) then
+                store[id] = { n = name, q = clean(quality), s = clean(sell) }
+            else
+                pending = pending + 1
+                pcall(C_Item.RequestLoadItemDataByID, id)
+            end
+        end
+    end
+    return pending
+end
+
+local function retryItemNames(ids, attempt)
+    local sec = LorestarDB and LorestarDB.snapshot and LorestarDB.snapshot.sections
+        and LorestarDB.snapshot.sections.itemnames
+    if not sec then return end
+    sec.pending = resolveItemNames(ids, sec.items)
+    if sec.pending > 0 and attempt < 3 and C_Timer and C_Timer.After then
+        C_Timer.After(3, function() retryItemNames(ids, attempt + 1) end)
+    else
+        say("itemnames: " .. (#ids - sec.pending) .. " of " .. #ids .. " names resolved"
+            .. (sec.pending > 0 and (", " .. sec.pending .. " still pending (run /lorestar dump itemnames again)") or "")
+            .. ". Type /reload to write the file.")
+    end
+end
+
+addSection("itemnames", function()
+    local out = { items = {}, pending = 0, total = 0 }
+    local recipes = (activeSnap and activeSnap.sections and activeSnap.sections.recipes)
+        or (LorestarDB and LorestarDB.snapshot and LorestarDB.snapshot.sections
+            and LorestarDB.snapshot.sections.recipes)
+    local ids = collectRecipeItemIDs(recipes)
+    if #ids == 0 then
+        out.note = "No recipe data found. Run /lorestar dump recipes (with a profession window open) first."
+        return out
+    end
+    if #ids > MAX_NAME_IDS then
+        out.truncated = #ids
+        for i = #ids, MAX_NAME_IDS + 1, -1 do ids[i] = nil end
+    end
+    out.total = #ids
+    -- Carry names resolved by earlier dumps forward.
+    local prev = LorestarDB and LorestarDB.snapshot and LorestarDB.snapshot.sections
+        and LorestarDB.snapshot.sections.itemnames
+    if type(prev) == "table" and type(prev.items) == "table" then
+        for id, v in pairs(prev.items) do
+            if type(id) == "number" and type(v) == "table" and v.n then out.items[id] = v end
+        end
+    end
+    out.pending = resolveItemNames(ids, out.items)
+    if out.pending > 0 and C_Timer and C_Timer.After then
+        C_Timer.After(3, function() retryItemNames(ids, 1) end)
+    end
+    return out
+end)
+
 -- Which auction house functions exist, and a few state checks. Prices are not
 -- read here: they are sampled passively while event tracking is on and you
 -- search the auction house yourself (see /lorestar events on).
@@ -617,6 +714,7 @@ local function runDump(only)
         errors = {},
     }
     local ran = 0
+    activeSnap = snap
     for _, s in ipairs(sections) do
         if only == "" or only == s.name then
             ran = ran + 1
@@ -628,6 +726,7 @@ local function runDump(only)
             end
         end
     end
+    activeSnap = nil
     if ran == 0 then
         say("Unknown section '" .. only .. "'. Sections: " .. sectionNames())
         return
@@ -655,6 +754,12 @@ local function runDump(only)
     local itemsSection = snap.sections.items
     if itemsSection and itemsSection.pending and itemsSection.pending > 0 then
         say(itemsSection.pending .. " item(s) were not cached yet. Wait a few seconds and run /lorestar dump items again.")
+    end
+    local namesSection = snap.sections.itemnames
+    if namesSection and namesSection.note then
+        say("itemnames: " .. namesSection.note)
+    elseif namesSection and namesSection.pending and namesSection.pending > 0 then
+        say("itemnames: " .. namesSection.pending .. " of " .. namesSection.total .. " names not cached yet, retrying for a few seconds...")
     end
     local recipesSection = snap.sections.recipes
     if recipesSection and recipesSection.note then

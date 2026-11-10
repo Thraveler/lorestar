@@ -200,7 +200,7 @@ export default function RecipesTable({ recipes, professions }: { recipes: Recipe
                           </tbody>
                         </table>
                         <p class="px-3 pt-2 text-xs text-[var(--color-text-muted)]">
-                          Output item: {r.output_item_id ? `#${r.output_item_id}` : '—'}
+                          Output item: {r.out_name ?? (r.output_item_id ? `#${r.output_item_id}` : '—')}
                           {r.out_listings !== null && ` · ${nf.format(r.out_listings)} listings`}
                         </p>
                       </td>
@@ -214,7 +214,7 @@ export default function RecipesTable({ recipes, professions }: { recipes: Recipe
       </div>
 
       <p class="mt-4 text-sm text-[var(--color-text-muted)]">
-        Reagent names are only known for items that were in your bags; the rest show as an item ID. Costs add up reagent AH medians
+        Reagent and output names come from the bags and from the addon's itemnames dump (v0.4.4+); anything not resolved shows as an item ID. Costs add up reagent AH medians
         (<span class="text-[var(--color-accent-red)]">+?</span> = some reagent has no price). The list of reagents comes straight from the game
         and may include alternative reagents for the same slot, so a cost can be overestimated. Output AH med is per unit and ignores how many items a craft yields.
       </p>

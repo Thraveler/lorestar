@@ -86,6 +86,7 @@ export interface RecipeRow {
   name: string | null;
   learned: number;
   output_item_id: number | null;
+  out_name: string | null;
   out_med: number | null;
   out_listings: number | null;
   reagents: Reagent[];
@@ -103,8 +104,10 @@ export function recipeRows(db: DatabaseSync, runId: number): RecipeRow[] {
   const recipes = db
     .prepare(
       `SELECT r.recipe_id, r.profession, r.name, COALESCE(r.learned, 0) AS learned, r.output_item_id,
-              p.med AS out_med, p.n AS out_listings
-       FROM recipes r LEFT JOIN prices p ON p.run_id = r.run_id AND p.item_id = r.output_item_id
+              o.name AS out_name, p.med AS out_med, p.n AS out_listings
+       FROM recipes r
+       LEFT JOIN prices p ON p.run_id = r.run_id AND p.item_id = r.output_item_id
+       LEFT JOIN items o ON o.item_id = r.output_item_id
        WHERE r.run_id = ? ORDER BY r.profession, r.name`,
     )
     .all(runId) as unknown as Omit<RecipeRow, 'reagents'>[];

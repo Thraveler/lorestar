@@ -52,6 +52,13 @@ def ingest(conn, run_dir):
                  info.get("7"), info.get("12"), info.get("13"), info.get("11"), b(info.get("17")), info.get("14")),
             )
 
+    # v0.4.4 itemnames: names for recipe reagents and outputs. Bag items keep their fuller info (INSERT OR IGNORE).
+    names = ((S.get("itemnames") or {}).get("items")) or {}
+    for iid, v in names.items():
+        if isinstance(v, dict) and v.get("n"):
+            conn.execute("INSERT OR IGNORE INTO items (item_id, name, quality, vendor_sell_price) VALUES (?,?,?,?)",
+                         (int(iid), v.get("n"), v.get("q"), v.get("s")))
+
     # Recipes (per profession) and professions
     by_prof = (S.get("recipes") or {}).get("byProfession") or {}
     primary = {}
@@ -84,7 +91,7 @@ def ingest(conn, run_dir):
         "INSERT INTO prices VALUES (?,?,?,?,?,?,?)",
         [(rid, int(i), r.get("n"), r.get("q"), r.get("m"), r.get("p10"), r.get("med")) for i, r in items.items()],
     )
-    print(f"{label}: {len(totals)} bag items, {n_recipes} recipes, {len(items)} prices")
+    print(f"{label}: {len(totals)} bag items, {len(names)} extra item names, {n_recipes} recipes, {len(items)} prices")
 
 
 def main():

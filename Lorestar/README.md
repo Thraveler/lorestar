@@ -15,7 +15,7 @@ network access.
    Forever's `Interface/AddOns/` directory. The folder must be named exactly `Lorestar`.
 2. If you used the old ForeverProbe, delete its folder first. You can also delete
    `ForeverProbe.lua` in `WTF/Account/<account>/SavedVariables/`.
-3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.3`.
+3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.4`.
 
 ## Commands
 
@@ -53,6 +53,10 @@ After any command, `/reload` (or logging out) writes the data to disk.
    material such as ore, and a piece of gear). Also loot, mine, craft and visit a vendor.
    Then `/lorestar events off`.
 5. `/reload`.
+
+## What's new in 0.4.4
+
+- New section `itemnames`: name, quality and vendor sell price for every item that appears in a dumped recipe (reagents and crafted outputs), not only items in your bags. Run it after `dump recipes`; a full `/lorestar dump` also includes it. Names the client has not cached yet are requested and re-read automatically for a few seconds; if some stay pending, run `/lorestar dump itemnames` again. Names resolved earlier are kept.
 
 ## What's new in 0.4.3
 
