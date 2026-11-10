@@ -18,15 +18,17 @@ Bag / inventory advisor addon for **WoW Forever** (Midnight Retail client, inter
 ```
 Lorestar/        the addon (folder name must match Lorestar.toc exactly)
 tools/           analyze.py: Lua SavedVariables -> JSON parser
-scripts/         build.sh (zip into dist/), new-run.sh (store + parse one in-game run)
+tools/ingest.py  parsed.json -> SQLite (schema in tools/schema.sql)
+scripts/         build.sh (zip into dist/), new-run.sh (store + parse + ingest one in-game run)
 data/runs/       one folder per in-game run (git-ignored, real dumps)
+data/lorestar.db local SQLite, one row set per run (git-ignored); view v_bag_advice joins bags, prices and recipes
 dist/            built zips (git-ignored)
 ```
 
 ## Workflow
 1. `scripts/build.sh` -> `dist/Lorestar-v<version>.zip` (syntax-checks with `luajit -bl`). Copy it to the game PC, unzip into `Interface/AddOns/`.
 2. In game, run commands, then `/reload` (SavedVariables are only written on reload/logout).
-3. Bring back `WTF/Account/<ACCOUNT>/SavedVariables/Lorestar.lua` and run `scripts/new-run.sh <file>`.
+3. Bring back `WTF/Account/<ACCOUNT>/SavedVariables/Lorestar.lua` and run `scripts/new-run.sh <file>` (stores, parses and ingests it).
 4. SavedVariables are large (~450 KB). Never read whole: parse and query `parsed.json` selectively. Parsed arrays have numeric-string keys.
 5. Re-run the privacy scan on every new dump (GUID `Player-`, battletag `\w+#\d{3,5}`, emails, owner/bidder keys, `<hidden>`).
 
