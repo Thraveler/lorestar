@@ -1,0 +1,107 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SectionHeader from '../components/ui/SectionHeader.astro';
+import LootTable from '../components/LootTable';
+import { openDb, listRuns, lootRows, lootProbe, runsWithLoot, priceSourceFor } from '../lib/db';
+import { groupBySource, groupByPlace } from '../lib/loot';
+import { money, nf } from '../lib/format';
+
+const db = openDb();
+const runs = db ? listRuns(db) : [];
+const withLoot = new Set(db ? runsWithLoot(db) : []);
+const wanted = Astro.url.searchParams.get('run');
+// Loot totals accumulate, so the latest run with loot data is the natural default.
+const run = runs.find((r) => r.label === wanted) ?? runs.find((r) => withLoot.has(r.id)) ?? runs[0];
+const records = db && run ? lootRows(db, run.id) : [];
+const probe = db && run ? lootProbe(db, run.id) : null;
+const priceSrc = db && run ? priceSourceFor(db, run.id) : null;
+db?.close();
+
+const sources = groupBySource(records);
+const places = groupByPlace(records);
+const totalAh = sources.reduce((n, g) => n + g.ahValue, 0);
+const totalVendor = sources.reduce((n, g) => n + g.vendorValue, 0);
+const totalItems = sources.reduce((n, g) => n + g.totalQty, 0);
+const cards: [string, string, string?][] = [
+  ['Windows seen / recorded', `${probe?.windows ?? '—'} / ${probe?.recorded ?? '—'}`],
+  ['Sources', nf.format(sources.length), `${places.length} places`],
+  ['Items looted', nf.format(totalItems)],
+  ['Value at AH median', money(totalAh), `vendor ${money(totalVendor)}`],
+];
+const blocked =
+  probe && ((probe.no_position ?? 0) > 0 || (probe.no_source ?? 0) > 0 || (probe.secret ?? 0) > 0 || (probe.errors ?? 0) > 0);
+---
+
+<Layout title="Loot">
+  <main class="mx-auto max-w-6xl px-6 pt-32 pb-24">
+    <SectionHeader
+      title="Loot"
+      subtitle="What you looted and where, by source and by place, valued at Auction House prices."
+    />
+
+    {!run ? (
+      <div class="rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6 opacity-60">
+        No runs yet. Run <code>scripts/new-run.sh &lt;SavedVariables file&gt;</code> first.
+      </div>
+    ) : records.length === 0 ? (
+      <div class="rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6 opacity-70">
+        <p class="font-heading text-xs tracking-widest uppercase text-[var(--color-text-muted)]">No loot data in this run</p>
+        <p class="mt-2">
+          Turn on <code>Loot</code> in the panel (or <code>/lorestar loot on</code>), loot for a while, then reload and ingest the run.
+          The loot probe exists from addon v0.4.7.
+        </p>
+      </div>
+    ) : (
+      <>
+        <section class="mb-8 grid grid-cols-2 gap-6 md:grid-cols-4">
+          {cards.map(([label, value, sub]) => (
+            <div class="flex flex-col gap-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-colors duration-200 hover:border-[var(--color-accent-gold)]">
+              <span class="font-heading text-xs tracking-widest uppercase text-[var(--color-text-muted)]">{label}</span>
+              <span class="font-heading text-lg font-semibold break-words">{value}</span>
+              {sub && <span class="text-sm text-[var(--color-text-muted)]">{sub}</span>}
+            </div>
+          ))}
+        </section>
+
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <label class="flex items-center gap-2 font-heading text-xs tracking-widest uppercase text-[var(--color-text-muted)]">
+            Run
+            <select
+              id="run-select"
+              class="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[var(--color-text)]"
+            >
+              {runs.map((r) => (
+                <option value={r.label} selected={r.id === run.id}>{r.label}{withLoot.has(r.id) ? '' : ' (no loot)'}</option>
+              ))}
+            </select>
+          </label>
+          {probe && (
+            <span class={`font-heading text-xs tracking-widest uppercase ${blocked ? 'text-[var(--color-accent-red)]' : 'text-[var(--color-text-muted)]'}`}>
+              Not readable: position {probe.no_position ?? 0} · source {probe.no_source ?? 0} · secret {probe.secret ?? 0} · errors {probe.errors ?? 0}
+            </span>
+          )}
+        </div>
+
+        {priceSrc && priceSrc.id !== run.id && (
+          <p class="mb-6 rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-muted)]">
+            This run has no Auction House scan. AH prices come from the scan of <span class="text-[var(--color-text)]">{priceSrc.label}</span> ({priceSrc.scan_time}).
+          </p>
+        )}
+        {!priceSrc && (
+          <p class="mb-6 rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-muted)]">
+            No Auction House scan has been ingested yet, so there are no AH values.
+          </p>
+        )}
+
+        <LootTable client:load records={records} />
+      </>
+    )}
+  </main>
+</Layout>
+
+<script>
+  document.getElementById('run-select')?.addEventListener('change', (e) => {
+    const label = (e.target as HTMLSelectElement).value;
+    window.location.search = `?run=${encodeURIComponent(label)}`;
+  });
+</script>

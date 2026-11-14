@@ -212,3 +212,78 @@ export function priceHistory(db: DatabaseSync, scope: PriceScope): PriceSeries[]
   }
   return [...byItem.values()];
 }
+
+export interface LootItem {
+  item_id: number;
+  qty: number;
+  name: string | null;
+  vendor: number | null;
+  med: number | null;
+  listings: number | null;
+}
+
+export interface LootRecord {
+  map_id: number;
+  zone: string | null;
+  cell_x: number;
+  cell_y: number;
+  source: string;
+  source_type: string | null;
+  source_id: number | null;
+  opens: number;
+  subzone: string | null;
+  items: LootItem[];
+}
+
+export interface LootProbe {
+  enabled: number | null;
+  windows: number | null;
+  recorded: number | null;
+  no_position: number | null;
+  no_source: number | null;
+  secret: number | null;
+  errors: number | null;
+  dropped: number | null;
+}
+
+// Runs that have loot data (the probe exists from addon v0.4.7).
+export function runsWithLoot(db: DatabaseSync): number[] {
+  return (db.prepare('SELECT DISTINCT run_id FROM loot_sources ORDER BY run_id DESC').all() as { run_id: number }[]).map(
+    (r) => r.run_id,
+  );
+}
+
+export function lootProbe(db: DatabaseSync, runId: number): LootProbe | null {
+  const row = db.prepare('SELECT * FROM loot_probe WHERE run_id = ?').get(runId);
+  return row ? ({ ...row } as unknown as LootProbe) : null;
+}
+
+// Loot records of a run with item names and AH prices (the run's own scan, or the latest earlier one).
+export function lootRows(db: DatabaseSync, runId: number): LootRecord[] {
+  const priceRun = priceSourceFor(db, runId)?.id ?? -1;
+  const records = db
+    .prepare(
+      `SELECT s.map_id, z.name AS zone, s.cell_x, s.cell_y, s.source, s.source_type, s.source_id, s.opens, s.subzone
+       FROM loot_sources s LEFT JOIN zones z ON z.map_id = s.map_id
+       WHERE s.run_id = :runId ORDER BY s.opens DESC`,
+    )
+    .all({ runId }) as unknown as Omit<LootRecord, 'items'>[];
+  const items = db
+    .prepare(
+      `SELECT l.map_id, l.cell_x, l.cell_y, l.source, l.item_id, l.qty,
+              i.name, i.vendor_sell_price AS vendor, p.med AS med, p.n AS listings
+       FROM loot_items l
+       LEFT JOIN items i ON i.item_id = l.item_id
+       LEFT JOIN prices p ON p.run_id = :pr AND p.item_id = l.item_id
+       WHERE l.run_id = :runId`,
+    )
+    .all({ runId, pr: priceRun }) as unknown as (LootItem & { map_id: number; cell_x: number; cell_y: number; source: string })[];
+  const byKey = new Map<string, LootItem[]>();
+  for (const { map_id, cell_x, cell_y, source, ...item } of items) {
+    const key = `${map_id}|${cell_x}|${cell_y}|${source}`;
+    const list = byKey.get(key) ?? [];
+    list.push({ ...item });
+    byKey.set(key, list);
+  }
+  return records.map((r) => ({ ...r, items: byKey.get(`${r.map_id}|${r.cell_x}|${r.cell_y}|${r.source}`) ?? [] }));
+}

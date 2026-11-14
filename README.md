@@ -28,7 +28,7 @@ Details and every command: [`Lorestar/README.md`](Lorestar/README.md).
 scripts/test.sh                      # syntax + all tests (needs luajit and python3)
 scripts/build.sh                     # dist/Lorestar-v<version>.zip
 scripts/new-run.sh <Lorestar.lua>    # SavedVariables from the game -> data/runs/ + data/lorestar.db
-cd web && pnpm install && pnpm dev   # viewer at http://127.0.0.1:4321
+cd web && pnpm install && pnpm dev   # viewer at http://127.0.0.1:4321 (pnpm test, pnpm check)
 ```
 
 The game PC does not need to build anything: download the zip from the release (for a version without a tag, from the latest CI run under Actions → Artifacts, kept 7 days).
