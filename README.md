@@ -31,6 +31,8 @@ scripts/new-run.sh <Lorestar.lua>    # SavedVariables from the game -> data/runs
 cd web && pnpm install && pnpm dev   # viewer at http://127.0.0.1:4321
 ```
 
+The game PC does not need to build anything: download the zip from the release (for a version without a tag, from the latest CI run under Actions → Artifacts, kept 7 days).
+
 Pushing a tag such as `v0.4.7` (it must match `Lorestar/Lorestar.toc`) builds the zip in CI and attaches it to a release.
 
 ## Privacy
@@ -42,5 +44,5 @@ Pushing a tag such as `v0.4.7` (it must match `Lorestar/Lorestar.toc`) builds th
 
 ## Requirements
 
-LuaJIT (syntax check and tests), Python 3.12+, Node 24+ with pnpm (viewer). Project context, decisions and history
+LuaJIT (tests; optional for `build.sh`, which also needs `zip`), Python 3.12+, Node 24+ with pnpm (viewer). Project context, decisions and history
 live in a separate personal knowledge base, not in this repository.
