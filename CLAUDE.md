@@ -1,6 +1,6 @@
 # Lorestar
 
-Bag / inventory advisor addon for **WoW Forever** (Midnight Retail client, interface 16001). For each bag item it will recommend keep / sell on AH / vendor / discard. Project knowledge, decisions and progress log live in the vault: `/Users/thraveler/workspace/vault/10-projects/lorestar/`. This file only holds what you need to write code.
+Bag / inventory advisor addon for **WoW Forever** (Midnight Retail client, interface 16001). For each bag item it will recommend keep / sell on AH / vendor / discard. Project knowledge, decisions and progress log live in the vault: `~/workspace/vault/10-projects/lorestar/`. This file only holds what you need to write code.
 
 ## Working with the user
 - Talk in Latin American Spanish, keep WoW terms in English (Auction House, vendor, reagent, bags). **Code, comments and docs in English.**

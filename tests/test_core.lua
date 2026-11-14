@@ -58,6 +58,24 @@ walk(P)
 local blob = table.concat(parts, " ")
 check("seller and bidder values are never stored", not blob:find("SellerName") and not blob:find("bidder%-secret"))
 
+-- Auction search samples: anonymous mode must scrub character GUIDs (crafted item links) and drop seller keys
+C_AuctionHouse.GetNumItemSearchResults = function() return 1 end
+C_AuctionHouse.GetItemSearchResultInfo = function()
+  return { itemLink = "|Hitem:1::::|h[Crafted]|h by Player-1234-0ABCDEF9", owner = "SellerName", buyoutAmount = 5 }
+end
+LorestarDB.auctionSamples = nil
+cmd("anon on"); cmd("events on")
+M.fire("ITEM_SEARCH_RESULTS_UPDATED", { itemID = 1 })
+local sample = LorestarDB.auctionSamples and LorestarDB.auctionSamples[1]
+local sparts = {}
+local function swalk(t) for k, v in pairs(t) do sparts[#sparts + 1] = tostring(k); if type(v) == "table" then swalk(v) else sparts[#sparts + 1] = tostring(v) end end end
+if sample then swalk(sample) end
+local sblob = table.concat(sparts, " ")
+check("auction sample is recorded", sample ~= nil and sample.first ~= nil)
+check("anonymous mode scrubs crafter GUIDs in samples", sample ~= nil and not sblob:find("0ABCDEF9") and sblob:find("<guid>") ~= nil)
+check("seller keys are dropped from samples", sample ~= nil and not sblob:find("SellerName"))
+cmd("events off")
+
 -- Item names: collected from recipes, retried while the client caches them
 local known = { [100] = "Copper Bar", [101] = "Tin Bar" }
 C_Item = {

@@ -13,3 +13,7 @@ data/lorestar.db-*
 web/node_modules/
 web/dist/
 web/.astro/
+
+# Python
+__pycache__/
+*.pyc

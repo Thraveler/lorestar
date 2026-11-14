@@ -1,6 +1,14 @@
 import sys, re, json, os
 src = open(sys.argv[1], encoding='utf-8', errors='replace').read()
-TOK = re.compile(r'''\s+|--[^\n]*|"((?:\\.|[^"\\])*)"|(-?\d+\.?\d*(?:[eE][-+]?\d+)?)|(true|false|nil)|([\[\]{}=,])|([A-Za-z_]\w*)''')
+TOK = re.compile(r'''\s+|--[^\n]*|"((?:\\.|[^"\\])*)"|(-?\d+\.?\d*(?:[eE][-+]?\d+)?)|(true|false|nil)(?!\w)|([\[\]{}=,])|([A-Za-z_]\w*)''')
+ESCAPES = {'n': '\n', 't': '\t', 'r': '\r', 'a': '\a', 'b': '\b', 'f': '\f', 'v': '\v'}
+
+
+def unescape(m):
+    g = m.group(1)
+    return chr(int(g)) if g.isdigit() else ESCAPES.get(g, g)
+
+
 toks = []
 pos = 0
 while pos < len(src):
@@ -12,8 +20,8 @@ while pos < len(src):
         continue
     if m.group(1) is not None or m.group(0) == '""':
         s = m.group(1) if m.group(1) is not None else ""
-        s = re.sub(r'\\(\d{1,3})', lambda x: chr(int(x.group(1))), s)
-        s = s.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+        # One pass, so an escaped backslash followed by a letter is not read as an escape (e.g. "a\\\\new").
+        s = re.sub(r'\\(\d{1,3}|.)', unescape, s, flags=re.S)
         toks.append(('s', s))
     elif m.group(2) is not None:
         n = m.group(2); toks.append(('n', float(n) if ('.' in n or 'e' in n.lower()) else int(n)))
@@ -46,7 +54,8 @@ def parse_value():
             if peek() == ('p', ','): p += 1
     p += 1
     return v
-assert toks[0][0] == 'i' and toks[1] == ('p', '=')
+if len(toks) < 3 or toks[0][0] != 'i' or toks[1] != ('p', '='):
+    raise SystemExit('expected a SavedVariables file: Name = { ... }')
 p = 2
 DB = parse_value()
 out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'parsed.json')

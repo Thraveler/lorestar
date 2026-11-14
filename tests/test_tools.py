@@ -117,6 +117,63 @@ class AnalyzeTests(unittest.TestCase):
             self.assertNotEqual(run(os.path.join(TOOLS, "analyze.py"), src).returncode, 0)
 
 
+    def test_backslashes_and_escapes(self):
+        # an escaped backslash followed by a letter must not become an escape sequence
+        with tempfile.TemporaryDirectory() as d:
+            src = os.path.join(d, "Lorestar.lua")
+            write(src, r'''LorestarDB = { ["path"] = "Interface\\notes\\new", ["tab"] = "a\tb", ["q"] = "x\"y", ["c"] = "\65\066" }''')
+            out = os.path.join(d, "out.json")
+            self.assertEqual(run(os.path.join(TOOLS, "analyze.py"), src, out).returncode, 0)
+            D = load_json(out)
+            self.assertEqual(D["path"], "Interface\\notes\\new")
+            self.assertEqual(D["tab"], "a\tb")
+            self.assertEqual(D["q"], 'x"y')
+            self.assertEqual(D["c"], "AB")
+
+    def test_identifiers_starting_with_a_keyword(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = os.path.join(d, "Lorestar.lua")
+            write(src, "LorestarDB = { nilfoo = 2, truebar = 3 }")
+            out = os.path.join(d, "out.json")
+            self.assertEqual(run(os.path.join(TOOLS, "analyze.py"), src, out).returncode, 0)
+            self.assertEqual(load_json(out), {"nilfoo": 2, "truebar": 3})
+
+    def test_empty_file_fails_with_a_message(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = os.path.join(d, "empty.lua")
+            write(src, "")
+            r = run(os.path.join(TOOLS, "analyze.py"), src)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("SavedVariables", r.stderr)
+
+
+class PrivacyScanTests(unittest.TestCase):
+    def scan(self, text):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "dump.lua")
+            write(path, text)
+            return run(os.path.join(TOOLS, "privacy_scan.py"), path)
+
+    def test_clean_dump_passes(self):
+        r = self.scan('LorestarDB = { ["name"] = "<hidden>", ["item"] = "|Hitem:2770::|h[Copper Ore]|h" }')
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_flags_each_kind_without_echoing_the_match(self):
+        samples = {
+            "character GUID": 'x = "|Hitem:1::Player-1234-0ABCDEF9|h"',
+            "battletag": 'x = "Someone#12345"',
+            "email address": 'x = "someone@example.com"',
+            "seller/bidder key": '["owner"] = "x"',
+        }
+        for kind, text in samples.items():
+            r = self.scan(text)
+            self.assertEqual(r.returncode, 1, kind)
+            self.assertIn(kind, r.stdout)
+            self.assertIn("line 1", r.stdout)
+            self.assertNotIn("0ABCDEF9", r.stdout)
+            self.assertNotIn("someone@example.com", r.stdout)
+
+
 class IngestTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

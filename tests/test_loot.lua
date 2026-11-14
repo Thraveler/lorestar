@@ -24,7 +24,8 @@ assert(loadfile("Lorestar/Lorestar_Loot.lua"))("Lorestar", ns)
 local L, check = ns.loot, M.check
 local a
 
-print("loot probe")
+io.write("loot probe\n")
+check("stats never create saved data", L.stats().opens == 0 and LorestarDB.loot == nil)
 M.fire("LOOT_OPENED")
 check("off by default: nothing recorded", LorestarDB.loot == nil or LorestarDB.loot.probe.opens == 0)
 

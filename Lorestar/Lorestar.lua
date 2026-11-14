@@ -870,7 +870,11 @@ local function sampleAuction(event, ...)
         entry.count = call("C_AuctionHouse.GetNumItemSearchResults", arg1)
         entry.first = call("C_AuctionHouse.GetItemSearchResultInfo", arg1, 1)
     end
-    db.auctionSamples[#db.auctionSamples + 1] = dropPrivateKeys(entry)
+    dropPrivateKeys(entry)
+    -- Samples bypass runDump, so anonymous mode has to scrub them here: item links of crafted
+    -- items carry the crafter's character GUID.
+    if isAnon() then scrub(entry, nameScrubPatterns()) end
+    db.auctionSamples[#db.auctionSamples + 1] = entry
 end
 
 local eventFrame = CreateFrame("Frame")

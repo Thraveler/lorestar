@@ -218,9 +218,12 @@ function api.setEnabled(on)
     end
 end
 
--- Totals for the status line and the panel.
+-- Totals for the status line and the panel. Read-only: it never creates the saved table.
 function api.stats()
-    local l = store()
+    local l = LorestarDB and LorestarDB.loot
+    if type(l) ~= "table" or type(l.agg) ~= "table" then
+        return { opens = 0, recorded = 0, records = 0, items = 0, places = 0 }
+    end
     local items, places = 0, {}
     for key, rec in pairs(l.agg) do
         for _, q in pairs(rec.items) do items = items + q end
@@ -228,7 +231,8 @@ function api.stats()
     end
     local nPlaces = 0
     for _ in pairs(places) do nPlaces = nPlaces + 1 end
-    return { opens = l.probe.opens, recorded = l.probe.recorded, records = l.nKeys, items = items, places = nPlaces }
+    local p = l.probe or {}
+    return { opens = p.opens or 0, recorded = p.recorded or 0, records = l.nKeys or 0, items = items, places = nPlaces }
 end
 
 function api.clear()
