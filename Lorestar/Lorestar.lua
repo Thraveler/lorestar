@@ -3,7 +3,7 @@
 
 local ADDON_NAME, ns = ...
 
-local VERSION = "0.4.6"
+local VERSION = "0.4.7"
 local PREFIX = "|cff33ff99Lorestar|r: "
 local MAX_DEPTH = 4
 
@@ -1064,6 +1064,7 @@ local function showHelp()
     say("  /lorestar events on|off    track events and sample auction house results you search")
     say("  /lorestar scan             with the auction house open, record lowest buyout per item")
     say("  /lorestar anon on|off      hide (default) or include name, realm, gold and event text")
+    say("  /lorestar loot on|off|status|clear  record what you loot and where (aggregated, off by default)")
     say("  /lorestar ui               open the panel (also: click the minimap button)")
     say("  /lorestar minimap show|hide  show or hide the minimap button")
     say("  /lorestar status           show what is recorded")
@@ -1090,7 +1091,7 @@ local function clearAll()
     LorestarDB.eventStatus = {}
     LorestarDB.auctionSamples = nil
     LorestarDB.prices = nil
-    say("Cleared. Type /reload to write the empty file.")
+    say("Cleared (loot data is kept: /lorestar loot clear). Type /reload to write the empty file.")
 end
 
 ns.actions = {
@@ -1139,6 +1140,8 @@ SlashCmdList["LORESTAR"] = function(msg)
         showStatus()
     elseif cmd == "clear" then
         clearAll()
+    elseif cmd == "loot" then
+        if ns.loot then ns.loot.command(rest or "") else say("The loot module is not available.") end
     elseif cmd == "ui" then
         if ns.togglePanel then ns.togglePanel() else say("The UI panel is not available.") end
     elseif cmd == "minimap" then

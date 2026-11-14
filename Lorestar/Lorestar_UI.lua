@@ -184,6 +184,12 @@ local function buildPanel()
     local btnAnon = makeButton(f, "Anonymous: ON", half, function() a.setAnon(not a.isAnon()) end,
         "Hide character name, realm and gold from the data (recommended).")
     row(btnEvents, btnAnon)
+    local btnLoot
+    if ns.loot then
+        btnLoot = makeButton(f, "Loot: OFF", half, function() ns.loot.setEnabled(not ns.loot.isEnabled()) end,
+            "Record what you loot and where (aggregated; no gold, names or GUIDs). Stays on after reloads.")
+        row(btnLoot)
+    end
 
     heading("Data")
     local btnReload = makeButton(f, "Reload UI (save)", half, function()
@@ -198,7 +204,7 @@ local function buildPanel()
         else
             self.confirmUntil = now + 5
         end
-    end, "Wipe everything recorded. Click twice within 5 seconds.")
+    end, "Wipe the collected data (loot data is kept). Click twice within 5 seconds.")
     row(btnReload, btnClear)
 
     local status = newText(f, 10, C.muted)
@@ -224,12 +230,20 @@ local function buildPanel()
         if ProfessionsFrame and ProfessionsFrame.IsShown then
             lines[#lines + 1] = "Profession window: " .. (ProfessionsFrame:IsShown() and "open" or "closed")
         end
+        if ns.loot then
+            local st = ns.loot.stats()
+            lines[#lines + 1] = "Loot: " .. st.opens .. " windows, " .. st.items .. " items, " .. st.places .. " places"
+        end
         if f.touched then lines[#lines + 1] = "Data changed: Reload UI to save it to disk." end
         status:SetText(table.concat(lines, "\n"))
         f:SetHeight(-y + 12 + status:GetStringHeight())
 
         setActive(btnEvents, d.eventsActive and true or false, "Events: " .. (d.eventsActive and "ON" or "OFF"))
         setActive(btnAnon, a.isAnon(), "Anonymous: " .. (a.isAnon() and "ON" or "OFF"))
+        if btnLoot then
+            local on = ns.loot.isEnabled()
+            setActive(btnLoot, on, "Loot: " .. (on and "ON" or "OFF"))
+        end
         local confirming = btnClear.confirmUntil and GetTime() < btnClear.confirmUntil
         btnClear.label:SetText(confirming and "Click again" or "Clear data")
         local cc = confirming and C.red or C.text

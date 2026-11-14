@@ -2,8 +2,9 @@
 ## Title: Lorestar
 ## Notes: Explores which APIs and data addons can access in WoW Forever. Groundwork for a bag and profession advisor.
 ## Author: local
-## Version: 0.4.6
+## Version: 0.4.7
 ## SavedVariables: LorestarDB
 
 Lorestar.lua
+Lorestar_Loot.lua
 Lorestar_UI.lua

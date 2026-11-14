@@ -85,13 +85,40 @@ def ingest(conn, run_dir):
             conn.execute("INSERT OR REPLACE INTO professions VALUES (?,?,?,?,?,?)",
                          (rid, name, row.get("3"), row.get("4"), row.get("7"), primary.get(name)))
 
+    # Loot probe (addon v0.4.7): cumulative aggregates as of this run
+    loot = D.get("loot") or {}
+    n_loot = 0
+    if isinstance(loot, dict) and loot.get("agg"):
+        for mid, name in (loot.get("zones") or {}).items():
+            conn.execute("INSERT OR REPLACE INTO zones VALUES (?,?)", (int(mid), name))
+        subs = loot.get("sub") or {}
+        for key, rec in loot["agg"].items():
+            parts = key.split("|")
+            if len(parts) != 4:
+                continue
+            mid, cx, cy, src = int(parts[0]), int(parts[1]), int(parts[2]), parts[3]
+            stype, _, sid = src.partition(":")
+            conn.execute(
+                "INSERT OR REPLACE INTO loot_sources VALUES (?,?,?,?,?,?,?,?,?)",
+                (rid, mid, cx, cy, src, stype if sid else None, int(sid) if sid.isdigit() else None,
+                 rec.get("opens"), subs.get(f"{mid}|{cx}|{cy}")))
+            for iid, qty in (rec.get("items") or {}).items():
+                conn.execute("INSERT OR REPLACE INTO loot_items VALUES (?,?,?,?,?,?,?)",
+                             (rid, mid, cx, cy, src, int(iid), qty))
+            n_loot += 1
+    pr = (loot.get("probe") or {}) if isinstance(loot, dict) else {}
+    if pr:
+        conn.execute("INSERT OR REPLACE INTO loot_probe VALUES (?,?,?,?,?,?,?,?,?)",
+                     (rid, b(loot.get("enabled")), pr.get("opens"), pr.get("recorded"), pr.get("noPosition"),
+                      pr.get("noSource"), pr.get("secret"), pr.get("errors"), pr.get("droppedKeys")))
+
     # AH prices
     items = P.get("items") or {}
     conn.executemany(
         "INSERT INTO prices VALUES (?,?,?,?,?,?,?)",
         [(rid, int(i), r.get("n"), r.get("q"), r.get("m"), r.get("p10"), r.get("med")) for i, r in items.items()],
     )
-    print(f"{label}: {len(totals)} bag items, {len(names)} extra item names, {n_recipes} recipes, {len(items)} prices")
+    print(f"{label}: {len(totals)} bag items, {len(names)} extra item names, {n_recipes} recipes, {len(items)} prices, {n_loot} loot records")
 
 
 def main():

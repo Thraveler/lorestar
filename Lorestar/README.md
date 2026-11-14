@@ -15,7 +15,7 @@ network access.
    Forever's `Interface/AddOns/` directory. The folder must be named exactly `Lorestar`.
 2. If you used the old ForeverProbe, delete its folder first. You can also delete
    `ForeverProbe.lua` in `WTF/Account/<account>/SavedVariables/`.
-3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.6`.
+3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.7`.
 
 ## Commands
 
@@ -23,6 +23,7 @@ network access.
 |---|---|
 | `/lorestar` | Show help |
 | `/lorestar ui` | Open the panel (or click the minimap button) |
+| `/lorestar loot on\|off\|status\|clear` | Record what you loot and where (aggregated, off by default) |
 | `/lorestar minimap show\|hide` | Show or hide the minimap button |
 | `/lorestar dump [section]` | Collect data. Without a section, all of them. |
 | `/lorestar api` | Record every global function, `C_*` namespace and Enum in this client |
@@ -55,6 +56,13 @@ After any command, `/reload` (or logging out) writes the data to disk.
    material such as ore, and a piece of gear). Also loot, mine, craft and visit a vendor.
    Then `/lorestar events off`.
 5. `/reload`.
+
+## What's new in 0.4.7
+
+- **Loot probe** (`Lorestar_Loot.lua`), off by default. `/lorestar loot on` (or the **Loot** button in the panel) records, for every loot window you open, which source gave which items and where, aggregated: counts per map cell (a 50x50 grid per map), per source (`npc:<id>` or `obj:<id>`) and per item. The switch is remembered across reloads. `/lorestar loot status` shows totals and what the game would not let the addon read; `/lorestar loot off` stops it; `/lorestar loot clear` wipes it.
+- Privacy: no gold or currency, no character name, no GUIDs (only the NPC or object ID), no timestamps. Item slots only. It never loots or acts for you.
+- `Clear data` in the panel and `/lorestar clear` keep the loot data on purpose, because it accumulates across sessions.
+- The probe also reports what the client allows (`probe` in the saved data): windows without a position, without a source, or with secret values.
 
 ## What's new in 0.4.6
 

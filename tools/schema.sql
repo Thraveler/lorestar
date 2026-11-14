@@ -75,6 +75,49 @@ CREATE TABLE IF NOT EXISTS prices (
     PRIMARY KEY (run_id, item_id)
 );
 
+-- Loot probe (addon v0.4.7). The addon accumulates loot across sessions, so each run stores the
+-- cumulative totals as of that run. Positions are 50x50 map cells (cell_x/cell_y = -1: unknown).
+CREATE TABLE IF NOT EXISTS zones (
+    map_id INTEGER PRIMARY KEY,
+    name   TEXT
+);
+
+CREATE TABLE IF NOT EXISTS loot_sources (
+    run_id      INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    map_id      INTEGER NOT NULL,
+    cell_x      INTEGER NOT NULL,
+    cell_y      INTEGER NOT NULL,
+    source      TEXT NOT NULL,              -- npc:<id>, obj:<id> or ? (unknown)
+    source_type TEXT,
+    source_id   INTEGER,
+    opens       INTEGER,                    -- times this source's loot window was opened here
+    subzone     TEXT,
+    PRIMARY KEY (run_id, map_id, cell_x, cell_y, source)
+);
+
+CREATE TABLE IF NOT EXISTS loot_items (
+    run_id  INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    map_id  INTEGER NOT NULL,
+    cell_x  INTEGER NOT NULL,
+    cell_y  INTEGER NOT NULL,
+    source  TEXT NOT NULL,
+    item_id INTEGER NOT NULL,
+    qty     INTEGER NOT NULL,
+    PRIMARY KEY (run_id, map_id, cell_x, cell_y, source, item_id)
+);
+
+CREATE TABLE IF NOT EXISTS loot_probe (
+    run_id      INTEGER PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
+    enabled     INTEGER,
+    windows     INTEGER,
+    recorded    INTEGER,
+    no_position INTEGER,
+    no_source   INTEGER,
+    secret      INTEGER,
+    errors      INTEGER,
+    dropped     INTEGER
+);
+
 CREATE INDEX IF NOT EXISTS idx_reagents_item ON recipe_reagents(item_id);
 CREATE INDEX IF NOT EXISTS idx_recipes_profession ON recipes(run_id, profession);
 
