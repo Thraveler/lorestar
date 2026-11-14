@@ -1,43 +1,53 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { BagRow } from '../lib/db';
 import { money, nf } from '../lib/format';
-import { signal, SIGNAL_LABEL, THIN_LISTINGS, type Signal } from '../lib/bags';
+import { ACTION_LABEL, DEFAULTS, NOTES, REASONS, type Action } from '../lib/rules';
 
-type Key = 'name' | 'qty' | 'vendor' | 'm' | 'p10' | 'med' | 'listings' | 'learned_recipes' | 'unlearned_recipes' | 'signal';
+type Key = 'name' | 'qty' | 'vendor' | 'm' | 'p10' | 'med' | 'listings' | 'learned_recipes' | 'unlearned_recipes' | 'advice' | 'gain';
 
 const COLUMNS: { key: Key; label: string; num?: boolean }[] = [
   { key: 'name', label: 'Item' },
   { key: 'qty', label: 'Qty', num: true },
   { key: 'vendor', label: 'Vendor', num: true },
-  { key: 'm', label: 'AH min', num: true },
-  { key: 'p10', label: 'AH p10', num: true },
   { key: 'med', label: 'AH med', num: true },
   { key: 'listings', label: 'Listings', num: true },
   { key: 'learned_recipes', label: 'Learned', num: true },
   { key: 'unlearned_recipes', label: 'Not learned', num: true },
-  { key: 'signal', label: 'Signal' },
+  { key: 'advice', label: 'Advice' },
+  { key: 'gain', label: 'Worth', num: true },
 ];
 
-const SIGNAL_CLASS: Record<Signal, string> = {
-  'ah-higher': 'border-[var(--color-accent-gold)] text-[var(--color-accent-gold)]',
-  close: 'border-[var(--color-border)] text-[var(--color-text)]',
-  'vendor-higher': 'border-[var(--color-border)] text-[var(--color-text-muted)]',
-  'no-data': 'border-dashed border-[var(--color-border)] text-[var(--color-text-muted)] opacity-70',
+const ACTION_CLASS: Record<Action, string> = {
+  sell_ah: 'border-[var(--color-accent-gold)] text-[var(--color-accent-gold)]',
+  vendor: 'border-[var(--color-text)] text-[var(--color-text)]',
+  discard: 'border-[var(--color-accent-red)] text-[var(--color-accent-red)]',
+  review: 'border-dashed border-[var(--color-text-muted)] text-[var(--color-text)]',
+  keep: 'border-[var(--color-border)] text-[var(--color-text-muted)]',
 };
 
-const SIGNAL_ORDER: Record<Signal, number> = { 'ah-higher': 0, close: 1, 'vendor-higher': 2, 'no-data': 3 };
+const ACTION_ORDER: Record<Action, number> = { sell_ah: 0, vendor: 1, discard: 2, review: 3, keep: 4 };
 
 function sortValue(r: BagRow, key: Key): string | number | null {
-  if (key === 'signal') return SIGNAL_ORDER[signal(r)];
+  if (key === 'advice') return r.advice ? ACTION_ORDER[r.advice.action] : 9;
+  if (key === 'gain') return r.advice ? r.advice.total : null;
   return r[key] as string | number | null;
+}
+
+function adviceText(r: BagRow): string {
+  const a = r.advice;
+  if (!a) return '';
+  if (a.keepQty > 0 && a.sellQty > 0) {
+    return `keep ${a.keepQty}, ${a.action === 'review' ? 'review' : a.action === 'sell_ah' ? 'sell' : a.action} ${a.sellQty}`;
+  }
+  return '';
 }
 
 export default function BagsTable({ rows }: { rows: BagRow[] }) {
   const [query, setQuery] = useState('');
   const [onlyPriced, setOnlyPriced] = useState(false);
   const [onlyReagents, setOnlyReagents] = useState(false);
-  const [sig, setSig] = useState<'all' | Signal>('all');
-  const [sortKey, setSortKey] = useState<Key>('signal');
+  const [action, setAction] = useState<'all' | Action>('all');
+  const [sortKey, setSortKey] = useState<Key>('advice');
   const [asc, setAsc] = useState(true);
 
   const view = useMemo(() => {
@@ -47,7 +57,7 @@ export default function BagsTable({ rows }: { rows: BagRow[] }) {
         (!q || (r.name ?? '').toLowerCase().includes(q)) &&
         (!onlyPriced || r.med !== null) &&
         (!onlyReagents || r.is_reagent === 1) &&
-        (sig === 'all' || signal(r) === sig),
+        (action === 'all' || r.advice?.action === action),
     );
     return [...filtered].sort((a, b) => {
       const av = sortValue(a, sortKey);
@@ -56,25 +66,27 @@ export default function BagsTable({ rows }: { rows: BagRow[] }) {
       if (av === null) return 1; // nulls last in either direction
       if (bv === null) return -1;
       const cmp = typeof av === 'string' ? av.localeCompare(String(bv)) : (av as number) - (bv as number);
-      return (asc ? cmp : -cmp) || (a.name ?? '').localeCompare(b.name ?? '');
+      return (asc ? cmp : -cmp) || (b.advice?.total ?? 0) - (a.advice?.total ?? 0) || (a.name ?? '').localeCompare(b.name ?? '');
     });
-  }, [rows, query, onlyPriced, onlyReagents, sig, sortKey, asc]);
+  }, [rows, query, onlyPriced, onlyReagents, action, sortKey, asc]);
 
   const totals = useMemo(() => {
-    let vendor = 0;
-    let ah = 0;
+    const t = { sell_ah: 0, vendor: 0, slots: 0, counts: { sell_ah: 0, vendor: 0, discard: 0, review: 0, keep: 0 } as Record<Action, number> };
     for (const r of view) {
-      vendor += r.qty * (r.vendor ?? 0);
-      if (r.med !== null) ah += r.qty * r.med;
+      if (!r.advice) continue;
+      t.counts[r.advice.action] += 1;
+      if (r.advice.action === 'sell_ah') t.sell_ah += r.advice.total;
+      if (r.advice.action === 'vendor') t.vendor += r.advice.total;
+      t.slots += r.advice.slotsFreed;
     }
-    return { vendor, ah };
+    return t;
   }, [view]);
 
   function sortBy(key: Key) {
     if (key === sortKey) setAsc(!asc);
     else {
       setSortKey(key);
-      setAsc(true);
+      setAsc(key === 'name' || key === 'advice');
     }
   }
 
@@ -91,10 +103,10 @@ export default function BagsTable({ rows }: { rows: BagRow[] }) {
           value={query}
           onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
         />
-        <select class={input} value={sig} onChange={(e) => setSig((e.target as HTMLSelectElement).value as 'all' | Signal)}>
-          <option value="all">All signals</option>
-          {(Object.keys(SIGNAL_LABEL) as Signal[]).map((s) => (
-            <option value={s}>{SIGNAL_LABEL[s]}</option>
+        <select class={input} value={action} onChange={(e) => setAction((e.target as HTMLSelectElement).value as 'all' | Action)}>
+          <option value="all">All advice</option>
+          {(Object.keys(ACTION_LABEL) as Action[]).map((a) => (
+            <option value={a}>{ACTION_LABEL[a]}</option>
           ))}
         </select>
         <label class="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
@@ -132,22 +144,29 @@ export default function BagsTable({ rows }: { rows: BagRow[] }) {
           </thead>
           <tbody>
             {view.map((r) => {
-              const s = signal(r);
-              const thin = r.listings !== null && r.listings < THIN_LISTINGS;
+              const a = r.advice;
+              const thin = r.listings !== null && r.listings < DEFAULTS.minListings;
+              const split = adviceText(r);
               return (
                 <tr>
-                  <td class="font-heading" style={{ color: `var(--color-quality-${r.quality ?? 1})` }}>
-                    {r.name ?? `#${r.item_id}`}
+                  <td class="!whitespace-normal">
+                    <div class="font-heading" style={{ color: `var(--color-quality-${r.quality ?? 1})` }}>
+                      {r.name ?? `#${r.item_id}`}
+                    </div>
+                    {a && (
+                      <div class="text-sm text-[var(--color-text-muted)]">
+                        {REASONS[a.reason] ?? a.reason}
+                        {a.notes.length > 0 && <> · {a.notes.map((n) => NOTES[n] ?? n).join(' · ')}</>}
+                      </div>
+                    )}
                   </td>
                   <td class="text-right">{nf.format(r.qty)}</td>
                   <td class="text-right">{money(r.vendor)}</td>
-                  <td class="text-right">{money(r.m)}</td>
-                  <td class="text-right">{money(r.p10)}</td>
                   <td class="text-right">{money(r.med)}</td>
                   <td class="text-right">
                     {r.listings === null ? '—' : nf.format(r.listings)}
                     {thin && (
-                      <span title={`Fewer than ${THIN_LISTINGS} listings: price may be unreliable`} class="ml-1 text-[var(--color-accent-red)]">
+                      <span title={`Fewer than ${DEFAULTS.minListings} listings: price may be unreliable`} class="ml-1 text-[var(--color-accent-red)]">
                         ●
                       </span>
                     )}
@@ -155,10 +174,20 @@ export default function BagsTable({ rows }: { rows: BagRow[] }) {
                   <td class="text-right">{r.learned_recipes || '—'}</td>
                   <td class="text-right">{r.unlearned_recipes || '—'}</td>
                   <td>
-                    <span class={`rounded border px-2 py-0.5 font-heading text-xs tracking-wide ${SIGNAL_CLASS[s]}`}>
-                      {SIGNAL_LABEL[s]}
-                    </span>
+                    {a ? (
+                      <span
+                        class={`rounded border px-2 py-0.5 font-heading text-xs tracking-wide ${ACTION_CLASS[a.action]}`}
+                        title={`Confidence: ${a.confidence}`}
+                      >
+                        {ACTION_LABEL[a.action]}
+                        {split && <span class="ml-1 normal-case">({split})</span>}
+                        {a.confidence !== 'high' && <span class="ml-1 text-[var(--color-accent-red)]">●</span>}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
                   </td>
+                  <td class="text-right">{a && a.total > 0 ? money(a.total) : '—'}</td>
                 </tr>
               );
             })}
@@ -167,10 +196,13 @@ export default function BagsTable({ rows }: { rows: BagRow[] }) {
       </div>
 
       <p class="mt-4 text-sm text-[var(--color-text-muted)]">
-        Nominal totals for the rows shown: vendor <span class="text-[var(--color-text)]">{money(totals.vendor)}</span> · AH median{' '}
-        <span class="text-[var(--color-text)]">{money(totals.ah)}</span>. Selling a whole stack would move the AH price, so
-        treat the AH figure as an upper bound. <span class="text-[var(--color-accent-red)]">●</span> = fewer than {THIN_LISTINGS} listings.
-        Signals compare vendor and AH median only (AH higher: median ≥ 1.5× vendor or vendor pays 0); they are not recommendations.
+        Of the rows shown: <span class="text-[var(--color-text)]">{totals.counts.sell_ah}</span> to sell on the AH (~
+        <span class="text-[var(--color-text)]">{money(totals.sell_ah)}</span>), <span class="text-[var(--color-text)]">{totals.counts.vendor}</span> to vendor (~
+        <span class="text-[var(--color-text)]">{money(totals.vendor)}</span>), {totals.counts.discard} to discard, {totals.counts.review} to review,{' '}
+        {totals.counts.keep} to keep; about <span class="text-[var(--color-text)]">{totals.slots}</span> bag slots would be freed. AH values are after the{' '}
+        {Math.round(DEFAULTS.ahCut * 100)}% cut and assume you can sell everything at the median; a big stack would move the price.{' '}
+        <span class="text-[var(--color-accent-red)]">●</span> next to a count of listings means fewer than {DEFAULTS.minListings}; next to the advice it means
+        low or medium confidence. These are recommendations: nothing is sold or moved for you.
       </p>
     </div>
   );

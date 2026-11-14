@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { RuleItem, RuleCtx } from './rules';
 
 // Read-only access to the SQLite built by tools/ingest.py. Override the path with LORESTAR_DB.
 export const DB_PATH = process.env.LORESTAR_DB ?? path.resolve(process.cwd(), '../data/lorestar.db');
@@ -58,6 +59,7 @@ export function listRuns(db: DatabaseSync): RunSummary[] {
 }
 
 export interface BagRow {
+  advice?: import('./rules').Advice | null;
   item_id: number;
   name: string | null;
   quality: number | null;
@@ -286,4 +288,74 @@ export function lootRows(db: DatabaseSync, runId: number): LootRecord[] {
     byKey.set(key, list);
   }
   return records.map((r) => ({ ...r, items: byKey.get(`${r.map_id}|${r.cell_x}|${r.cell_y}|${r.source}`) ?? [] }));
+}
+
+export interface InGameAdvice {
+  action: string;
+  keep_qty: number | null;
+  sell_qty: number | null;
+  unit: number | null;
+  reason: string | null;
+  confidence: string | null;
+}
+
+export interface AdviceInput {
+  name: string | null;
+  item: RuleItem;
+  ctx: RuleCtx;
+  inGame: InGameAdvice | null; // what the addon itself recommended, when it saved its advice
+}
+
+// Everything the rules need for each item in the bags of a run.
+export function adviceInputs(db: DatabaseSync, runId: number): AdviceInput[] {
+  const priceRun = priceSourceFor(db, runId)?.id ?? -1;
+  const run = db.prepare('SELECT bag_used, bag_slots FROM runs WHERE id = ?').get(runId) as
+    | { bag_used: number | null; bag_slots: number | null }
+    | undefined;
+  const freeSlots = run && run.bag_slots !== null && run.bag_used !== null ? run.bag_slots - run.bag_used : null;
+  const learned = (extra: string) =>
+    `(SELECT ${extra} FROM recipe_reagents rr JOIN recipes r ON r.run_id = rr.run_id AND r.recipe_id = rr.recipe_id
+       WHERE rr.run_id = b.run_id AND rr.item_id = b.item_id AND r.learned = `;
+  const rows = db
+    .prepare(
+      `SELECT b.item_id AS id, b.qty, i.name, i.quality, i.class_id AS classID, i.vendor_sell_price AS vendor,
+              i.stack_size AS stack, i.bind_type AS bind,
+              p.med, p.p10, p.m, p.n, p.q,
+              ${learned('COUNT(*)')}1) AS learnedCount,
+              ${learned('COALESCE(MAX(rr.qty), 0)')}1) AS learnedMax,
+              ${learned('COUNT(*)')}0) AS unlearnedCount,
+              a.action AS a_action, a.keep_qty AS a_keep, a.sell_qty AS a_sell, a.unit AS a_unit,
+              a.reason AS a_reason, a.confidence AS a_conf, a.bound AS a_bound
+       FROM bag_items b
+       LEFT JOIN items i ON i.item_id = b.item_id
+       LEFT JOIN prices p ON p.run_id = :pr AND p.item_id = b.item_id
+       LEFT JOIN advice_items a ON a.run_id = b.run_id AND a.item_id = b.item_id
+       WHERE b.run_id = :runId ORDER BY i.name`,
+    )
+    .all({ runId, pr: priceRun }) as unknown as Record<string, number | string | null>[];
+  return rows.map((r) => {
+    // The addon knows whether this very stack is bound; the database only knows the item's binding rule.
+    const bound = r.a_bound !== null ? r.a_bound === 1 : r.bind === 1;
+    return {
+      name: r.name as string | null,
+      item: {
+        id: r.id as number, qty: r.qty as number, quality: r.quality as number | null, classID: r.classID as number | null,
+        vendor: r.vendor as number | null, stack: r.stack as number | null, bound,
+      },
+      ctx: {
+        price: r.med === null && r.n === null ? null : { med: r.med as number | null, p10: r.p10 as number | null, m: r.m as number | null, n: r.n as number | null, q: r.q as number | null },
+        recipes: { learnedCount: r.learnedCount as number, learnedMax: r.learnedMax as number, unlearnedCount: r.unlearnedCount as number },
+        freeSlots,
+      },
+      inGame: r.a_action === null ? null : {
+        action: r.a_action as string, keep_qty: r.a_keep as number | null, sell_qty: r.a_sell as number | null,
+        unit: r.a_unit as number | null, reason: r.a_reason as string | null, confidence: r.a_conf as string | null,
+      },
+    };
+  });
+}
+
+export function adviceMeta(db: DatabaseSync, runId: number): { advice_time: string | null; price_time: string | null } | null {
+  const row = db.prepare('SELECT advice_time, price_time FROM advice_runs WHERE run_id = ?').get(runId);
+  return row ? ({ ...row } as { advice_time: string | null; price_time: string | null }) : null;
 }

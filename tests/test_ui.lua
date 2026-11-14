@@ -17,6 +17,7 @@ local ns = { actions = {
 ns.loot = { isEnabled = function() return lootOn end,
   setEnabled = function(on) lootOn = on; calls[#calls + 1] = "loot:" .. tostring(on) end,
   stats = function() return { opens = 9, items = 42, places = 3 } end }
+ns.advisor = { report = function() calls[#calls + 1] = "advise" end }
 local reloaded = false
 function ReloadUI() reloaded = true end
 
@@ -44,9 +45,9 @@ check("toggle shows the panel", panel.shown == true)
 check("status shows last dump and scan", panel.status.text:find("Last dump: 2026%-11%-10") and panel.status.text:find("4459 items"))
 check("status shows pending names and loot", panel.status.text:find("pending: 3") and panel.status.text:find("Loot: 9 windows"))
 
-for _, l in ipairs({ "Dump all", "Dump items", "Dump recipes", "Dump item names", "Scan AH prices", "Events: OFF", "Anonymous: ON", "Loot: OFF" }) do click(l) end
+for _, l in ipairs({ "Dump all", "Dump items", "Dump recipes", "Dump item names", "Advise: what to do with my bags", "Scan AH prices", "Events: OFF", "Anonymous: ON", "Loot: OFF" }) do click(l) end
 check("buttons trigger the right actions",
-  table.concat(calls, " ") == "dump: dump:items dump:recipes dump:itemnames scan events:true anon:false loot:true")
+  table.concat(calls, " ") == "dump: dump:items dump:recipes dump:itemnames advise scan events:true anon:false loot:true")
 check("toggle labels follow the state", button("Events: ON") and button("Anonymous: OFF") and button("Loot: ON"))
 
 calls = {}

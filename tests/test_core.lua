@@ -47,6 +47,7 @@ M.fire("REPLICATE_ITEM_LIST_UPDATE")
 M.flushTimers(3)
 local P = LorestarDB.prices
 check("scan stores totals", P and P.rows == 4 and P.schema == 2)
+check("scan stores an epoch timestamp for age checks", type(P.ts) == "number")
 check("min, p10 and weighted median", P.items[100].m == 100 and P.items[100].p10 == 150 and P.items[100].med == 150)
 check("counts listings and quantity", P.items[100].n == 2 and P.items[100].q == 11)
 check("single listing", P.items[200].m == 10 and P.items[200].med == 10)
@@ -57,6 +58,19 @@ local function walk(t) for k, v in pairs(t) do parts[#parts + 1] = tostring(k); 
 walk(P)
 local blob = table.concat(parts, " ")
 check("seller and bidder values are never stored", not blob:find("SellerName") and not blob:find("bidder%-secret"))
+
+-- Recipes: skill data and units made per craft (v0.4.8)
+C_TradeSkillUI = {
+  GetAllRecipeIDs = function() return { 11, 12 } end,
+  GetRecipeInfo = function(id) return { name = "Recipe " .. id, learned = id == 11, categoryID = 3, relativeDifficulty = 2, maxTrivialLevel = 90, canSkillUp = true } end,
+  GetRecipeSchematic = function(id) return { outputItemID = 500 + id, quantityMin = 1, quantityMax = 3,
+    reagentSlotSchematics = { { quantityRequired = 2, reagents = { { itemID = 2770 } } } } } end,
+  GetBaseProfessionInfo = function() return { professionName = "Mining" } end,
+}
+cmd("dump recipes")
+local rec = LorestarDB.snapshot.sections.recipes.byProfession.Mining
+check("recipes keep skill data", rec and rec.modern[1].diff == 2 and rec.modern[1].trivial == 90 and rec.modern[1].skillUp == true)
+check("recipes keep the units made per craft", rec.modern[1].outMin == 1 and rec.modern[1].outMax == 3 and rec.modern[1].reagents[1].qty == 2)
 
 -- Auction search samples: anonymous mode must scrub character GUIDs (crafted item links) and drop seller keys
 C_AuctionHouse.GetNumItemSearchResults = function() return 1 end

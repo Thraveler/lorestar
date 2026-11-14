@@ -3,13 +3,18 @@ import Layout from '../layouts/Layout.astro';
 import SectionHeader from '../components/ui/SectionHeader.astro';
 import BagsTable from '../components/BagsTable';
 import QualityTheme from '../components/QualityTheme';
-import { openDb, listRuns, bagRows, priceSourceFor } from '../lib/db';
+import { openDb, listRuns, bagRows, priceSourceFor, adviceInputs, adviceMeta } from '../lib/db';
+import { adviceByItem, compareAdvice } from '../lib/advice';
 
 const db = openDb();
 const runs = db ? listRuns(db) : [];
 const wanted = Astro.url.searchParams.get('run');
 const run = runs.find((r) => r.label === wanted) ?? runs[0];
-const rows = db && run ? bagRows(db, run.id) : [];
+const inputs = db && run ? adviceInputs(db, run.id) : [];
+const webAdvice = adviceByItem(inputs);
+const rows = (db && run ? bagRows(db, run.id) : []).map((r) => ({ ...r, advice: webAdvice.get(r.item_id) ?? null }));
+const meta = db && run ? adviceMeta(db, run.id) : null;
+const comparison = compareAdvice(inputs, webAdvice);
 const priceSrc = db && run ? priceSourceFor(db, run.id) : null;
 db?.close();
 ---
@@ -18,7 +23,7 @@ db?.close();
   <main class="mx-auto max-w-6xl px-6 pt-32 pb-24">
     <SectionHeader
       title="Bags"
-      subtitle="What is in your bags, with vendor price, Auction House prices and the recipes that use each item."
+      subtitle="What is in your bags, with vendor and Auction House prices, the recipes that use each item, and a recommendation for each."
     />
 
     {!run ? (
@@ -52,6 +57,25 @@ db?.close();
         {!priceSrc && (
           <p class="mb-6 rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-muted)]">
             No Auction House scan has been ingested yet, so there are no AH prices.
+          </p>
+        )}
+        {meta && (
+          <p class={`mb-6 rounded border border-dashed p-4 text-sm ${comparison.mismatches.length ? 'border-[var(--color-accent-red)]' : 'border-[var(--color-border)]'} bg-[var(--color-surface)] text-[var(--color-text-muted)]`}>
+            The addon saved its own advice in game ({meta.advice_time}). It matches this page on{' '}
+            <span class="text-[var(--color-text)]">{comparison.compared - comparison.mismatches.length} of {comparison.compared}</span> items.
+            {comparison.mismatches.length > 0 && (
+              <>
+                {' '}Differences (expected if the data changed after the addon ran, otherwise a bug in one of the two engines):
+                <ul class="mt-2 list-disc pl-5">
+                  {comparison.mismatches.slice(0, 8).map((m) => (
+                    <li>
+                      {m.name ?? `#${m.id}`}: in game <span class="text-[var(--color-text)]">{m.inGame.action}</span> (keep {m.inGame.keep_qty ?? 0}, sell {m.inGame.sell_qty ?? 0}), here{' '}
+                      <span class="text-[var(--color-text)]">{m.web.action}</span> (keep {m.web.keepQty}, sell {m.web.sellQty})
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </p>
         )}
         <BagsTable client:load rows={rows} />

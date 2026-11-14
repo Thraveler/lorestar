@@ -6,6 +6,21 @@ Idempotent: re-ingesting a run replaces its rows. Standard library only.
 import argparse, json, os, sqlite3, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# Columns added after the first release; older databases get them with ALTER TABLE.
+NEW_COLUMNS = {
+    "items": {"stack_size": "INTEGER"},
+    "recipes": {"difficulty": "INTEGER", "trivial_level": "INTEGER", "can_skill_up": "INTEGER",
+                "out_min": "INTEGER", "out_max": "INTEGER"},
+}
+
+
+def migrate(conn):
+    for table, columns in NEW_COLUMNS.items():
+        have = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, kind in columns.items():
+            if name not in have:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
 DEFAULT_DB = os.path.join(HERE, "..", "data", "lorestar.db")
 
 
@@ -47,9 +62,12 @@ def ingest(conn, run_dir):
         info = (infos.get(iid) or {}).get("info")
         if info:
             conn.execute(
-                "INSERT OR REPLACE INTO items VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO items (item_id, name, quality, item_level, min_level, type, subtype,"
+                " class_id, subclass_id, vendor_sell_price, is_reagent, bind_type, stack_size)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (int(iid), info.get("1"), info.get("3"), info.get("4"), info.get("5"), info.get("6"),
-                 info.get("7"), info.get("12"), info.get("13"), info.get("11"), b(info.get("17")), info.get("14")),
+                 info.get("7"), info.get("12"), info.get("13"), info.get("11"), b(info.get("17")), info.get("14"),
+                 info.get("8")),
             )
 
     # v0.4.4 itemnames: names for recipe reagents and outputs. Bag items keep their fuller info (INSERT OR IGNORE).
@@ -71,9 +89,13 @@ def ingest(conn, run_dir):
             rec = row.get("id")
             if rec is None:
                 continue
-            conn.execute("INSERT OR REPLACE INTO recipes VALUES (?,?,?,?,?,?,?)",
-                         (rid, rec, prof, row.get("name"), b(row.get("learned")),
-                          row.get("categoryID"), row.get("outputItemID")))
+            conn.execute(
+                "INSERT OR REPLACE INTO recipes (run_id, recipe_id, profession, name, learned, category_id,"
+                " output_item_id, difficulty, trivial_level, can_skill_up, out_min, out_max)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (rid, rec, prof, row.get("name"), b(row.get("learned")), row.get("categoryID"),
+                 row.get("outputItemID"), row.get("diff"), row.get("trivial"), b(row.get("skillUp")),
+                 row.get("outMin"), row.get("outMax")))
             n_recipes += 1
             for rg in seq(row.get("reagents")):
                 if isinstance(rg, dict) and isinstance(rg.get("itemID"), int):
@@ -84,6 +106,22 @@ def ingest(conn, run_dir):
             name = row["1"]
             conn.execute("INSERT OR REPLACE INTO professions VALUES (?,?,?,?,?,?)",
                          (rid, name, row.get("3"), row.get("4"), row.get("7"), primary.get(name)))
+
+    # Names and facts remembered at loot time (addon v0.4.8); bag and recipe info wins (INSERT OR IGNORE)
+    for iid, v in ((D.get("loot") or {}).get("names") or {}).items():
+        if isinstance(v, dict) and v.get("n"):
+            conn.execute("INSERT OR IGNORE INTO items (item_id, name, quality, vendor_sell_price, class_id, stack_size)"
+                         " VALUES (?,?,?,?,?,?)", (int(iid), v.get("n"), v.get("q"), v.get("s"), v.get("c"), v.get("st")))
+
+    # In-game advisor output (addon v0.4.8), kept to compare with the web engine
+    advice = D.get("advice") or {}
+    n_advice = 0
+    if isinstance(advice, dict) and advice.get("items"):
+        conn.execute("INSERT OR REPLACE INTO advice_runs VALUES (?,?,?)", (rid, advice.get("time"), advice.get("priceTime")))
+        for iid, a in advice["items"].items():
+            conn.execute("INSERT OR REPLACE INTO advice_items VALUES (?,?,?,?,?,?,?,?,?)",
+                         (rid, int(iid), a.get("a"), a.get("k"), a.get("s"), a.get("u"), a.get("r"), a.get("c"), a.get("b")))
+            n_advice += 1
 
     # Loot probe (addon v0.4.7): cumulative aggregates as of this run
     loot = D.get("loot") or {}
@@ -118,7 +156,7 @@ def ingest(conn, run_dir):
         "INSERT INTO prices VALUES (?,?,?,?,?,?,?)",
         [(rid, int(i), r.get("n"), r.get("q"), r.get("m"), r.get("p10"), r.get("med")) for i, r in items.items()],
     )
-    print(f"{label}: {len(totals)} bag items, {len(names)} extra item names, {n_recipes} recipes, {len(items)} prices, {n_loot} loot records")
+    print(f"{label}: {len(totals)} bag items, {len(names)} extra item names, {n_recipes} recipes, {len(items)} prices, {n_loot} loot records, {n_advice} advice rows")
 
 
 def main():
@@ -130,6 +168,7 @@ def main():
     conn = sqlite3.connect(a.db)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(open(os.path.join(HERE, "schema.sql"), encoding="utf-8").read())
+    migrate(conn)
     with conn:
         for r in a.runs:
             ingest(conn, r)

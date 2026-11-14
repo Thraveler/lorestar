@@ -17,7 +17,7 @@ Bag / inventory advisor addon for **WoW Forever** (Midnight Retail client, inter
 ## Layout
 ```
 Lorestar/        the addon (folder name must match Lorestar.toc exactly): Lorestar.lua (core, slash commands),
-                 Lorestar_Loot.lua (loot probe, ns.loot), Lorestar_UI.lua (minimap button + panel, built under pcall; core exposes ns.actions)
+                 Lorestar_Advisor.lua (rules engine + /lorestar advise, ns.advisor), Lorestar_Loot.lua (loot probe, ns.loot), Lorestar_UI.lua (minimap button + panel, built under pcall; core exposes ns.actions)
 tools/           analyze.py: Lua SavedVariables -> JSON parser
 tools/ingest.py  parsed.json -> SQLite (schema in tools/schema.sql)
 scripts/         build.sh (zip into dist/), new-run.sh (store + parse + ingest one in-game run)
@@ -33,9 +33,13 @@ dist/            built zips (git-ignored)
 4. SavedVariables are large (~450 KB). Never read whole: parse and query `parsed.json` selectively. Parsed arrays have numeric-string keys.
 5. Re-run the privacy scan on every new dump (GUID `Player-`, battletag `\w+#\d{3,5}`, emails, owner/bidder keys, `<hidden>`).
 
+## Rules engine (keep Lua and TypeScript in sync)
+- `A.evaluate` in `Lorestar/Lorestar_Advisor.lua` and `evaluate` in `web/src/lib/rules.ts` are the same rules in two languages. Both are tested against `tests/rules_cases.json`: add or change a case there first, then make both engines pass (`scripts/test.sh` and `cd web && pnpm test`).
+- The addon saves its advice in `LorestarDB.advice`; the Bags page compares it with the web engine so a divergence shows up in the data.
+
 ## Gotchas
 - Lua 5.1: no `goto`, no integer division, `#` on tables with holes is unreliable. Wrap every API in `pcall`.
 - Profession window must be open for the `recipes` dump. AH must be open for `/lorestar scan` (throttled ~15 min).
 - `GetReplicateItemInfo` indexes start at 0; the positional return order is assumed, verify against `prices.probe`.
 - `TRADE_SKILL_UPDATE` does not exist in Forever. Avoid slash commands `/lm`, `/ls`, `/codex`, `/titan`.
-- Current version: see `Lorestar/Lorestar.toc`. v0.4.3 ran clean in game on 2026-11-09; v0.4.5 ran in game (no AH scan that time); v0.4.6 and v0.4.7 passed syntax checks and simulated tests, not yet run in game.
+- Current version: see `Lorestar/Lorestar.toc`. v0.4.3 ran clean in game on 2026-11-09; v0.4.7 ran in game (loot probe validated); v0.4.8 (advisor) passed simulated tests only, not yet run in game.

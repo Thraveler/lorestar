@@ -41,6 +41,7 @@ function M.install()
   _G.UISpecialFrames, _G.tinsert = {}, table.insert
   _G.SlashCmdList = {}
   _G.date = os.date
+  _G.time = os.time
   _G.print = function(...)
     local parts = {}
     for i = 1, select("#", ...) do parts[#parts + 1] = tostring((select(i, ...))) end

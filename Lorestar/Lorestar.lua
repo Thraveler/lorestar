@@ -3,7 +3,7 @@
 
 local ADDON_NAME, ns = ...
 
-local VERSION = "0.4.7"
+local VERSION = "0.4.8"
 local PREFIX = "|cff33ff99Lorestar|r: "
 local MAX_DEPTH = 4
 
@@ -435,6 +435,10 @@ addSection("recipes", function()
                     row.name = clean(info.name)
                     row.learned = clean(info.learned)
                     row.categoryID = clean(info.categoryID)
+                    -- v0.4.8: skill data, for knowing which recipes still level you up
+                    row.diff = clean(info.relativeDifficulty)
+                    row.trivial = clean(info.maxTrivialLevel)
+                    row.skillUp = clean(info.canSkillUp)
                     if i == 1 then row.sampleInfo = clean(info) end
                 elseif not okI then
                     row.infoError = tostring(info)
@@ -442,6 +446,8 @@ addSection("recipes", function()
                 local okS, schem = pcall(C_TradeSkillUI.GetRecipeSchematic, id, false)
                 if okS and type(schem) == "table" and not isSecret(schem) then
                     row.outputItemID = clean(schem.outputItemID)
+                    row.outMin = clean(schem.quantityMin)   -- v0.4.8: units made per craft
+                    row.outMax = clean(schem.quantityMax)
                     row.reagents = {}
                     local slots = schem.reagentSlotSchematics
                     if type(slots) == "table" then
@@ -964,7 +970,7 @@ local function finalizePrices(items, total, probe)
             C_Timer.After(0, fin)
         else
             LorestarDB.prices = {
-                time = date("%Y-%m-%d %H:%M:%S"), rows = total, distinct = #keys,
+                time = date("%Y-%m-%d %H:%M:%S"), ts = time(), rows = total, distinct = #keys,
                 probe = probe, items = items, schema = 2,
             }
             scanning = false
@@ -1068,6 +1074,7 @@ local function showHelp()
     say("  /lorestar events on|off    track events and sample auction house results you search")
     say("  /lorestar scan             with the auction house open, record lowest buyout per item")
     say("  /lorestar anon on|off      hide (default) or include name, realm, gold and event text")
+    say("  /lorestar advise [all]     recommend what to do with each item in your bags (never acts)")
     say("  /lorestar loot on|off|status|clear  record what you loot and where (aggregated, off by default)")
     say("  /lorestar ui               open the panel (also: click the minimap button)")
     say("  /lorestar minimap show|hide  show or hide the minimap button")
@@ -1144,6 +1151,8 @@ SlashCmdList["LORESTAR"] = function(msg)
         showStatus()
     elseif cmd == "clear" then
         clearAll()
+    elseif cmd == "advise" or cmd == "advice" then
+        if ns.advisor then ns.advisor.command(rest or "") else say("The advisor module is not available.") end
     elseif cmd == "loot" then
         if ns.loot then ns.loot.command(rest or "") else say("The loot module is not available.") end
     elseif cmd == "ui" then

@@ -20,6 +20,9 @@ function GetLootSourceInfo(i) return loot[i].guid, 1 end
 local secret = {}
 function issecretvalue(v) return secret[v] == true end
 
+C_Item = { GetItemInfo = function(link)
+  if link:find("item:2770") then return "Copper Ore", link, 1, 1, 0, "Trade Goods", "Metal", 20, "", "icon", 5, 7 end
+end }
 assert(loadfile("Lorestar/Lorestar_Loot.lua"))("Lorestar", ns)
 local L, check = ns.loot, M.check
 local a
@@ -42,6 +45,11 @@ check("money slot ignored", (function() for _, r in pairs(a) do for _, q in pair
 M.fire("LOOT_OPENED")
 check("second window adds opens and quantity", a["1411|27|31|npc:3111"].opens == 2 and a["1411|27|31|npc:3111"].items[2770] == 4)
 check("zone and subzone remembered", LorestarDB.loot.zones[1411] == "Durotar" and LorestarDB.loot.sub["1411|27|31"] == "Razor Hill")
+
+check("looted items remember name, quality, sell price and class",
+  LorestarDB.loot.names[2770] and LorestarDB.loot.names[2770].n == "Copper Ore" and LorestarDB.loot.names[2770].s == 5
+  and LorestarDB.loot.names[2770].c == 7 and LorestarDB.loot.names[2770].st == 20)
+check("an uncached item still gets its name from the link", LorestarDB.loot.names[2771] and LorestarDB.loot.names[2771].n == "Tin Ore")
 
 local parts = {}
 local function walk(t) for k, v in pairs(t) do parts[#parts + 1] = tostring(k); if type(v) == "table" then walk(v) else parts[#parts + 1] = tostring(v) end end end

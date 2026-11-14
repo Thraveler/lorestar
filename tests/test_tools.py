@@ -232,6 +232,53 @@ class IngestTests(unittest.TestCase):
         c = self.ingest(self.make_run("run-a", scan=False))
         self.assertIsNone(c.execute("SELECT med FROM v_bag_advice WHERE name='Copper Ore'").fetchone()[0])
 
+    def v048(self):
+        """A run as the v0.4.8 addon writes it: recipe skill data, looted item names and saved advice."""
+        D = synthetic_run(loot=True)
+        row = D["snapshot"]["sections"]["recipes"]["byProfession"]["Mining"]["modern"]["1"]
+        row.update({"diff": 2, "trivial": 90, "skillUp": True, "outMin": 1, "outMax": 3})
+        D["snapshot"]["sections"]["items"]["items"]["2770"]["info"]["8"] = 20
+        D["loot"]["names"] = {"2770": {"n": "WRONG", "q": 9, "s": 999, "c": 7, "st": 5},
+                              "4018": {"n": "Courser Eye", "q": 1, "s": 0, "c": 15, "st": 20}}
+        D["advice"] = {"time": "2026-11-14 16:00:00", "priceTime": "2026-11-14 15:48:28",
+                       "items": {"2770": {"a": "keep", "k": 6, "s": 0, "u": 0, "r": "reagent_learned", "c": "high", "b": 0},
+                                 "2589": {"a": "sell_ah", "k": 20, "s": 32, "u": 27, "r": "ah_better", "c": "high", "b": 1}}}
+        d = os.path.join(self.tmp.name, "run-v048")
+        os.makedirs(d)
+        dump_json(os.path.join(d, "parsed.json"), D)
+        return d
+
+    def test_v048_fields(self):
+        c = self.ingest(self.v048())
+        q = lambda sql: c.execute(sql).fetchall()
+        self.assertEqual(q("SELECT difficulty, trivial_level, can_skill_up, out_min, out_max FROM recipes WHERE recipe_id=2657")[0], (2, 90, 1, 1, 3))
+        self.assertEqual(q("SELECT stack_size FROM items WHERE item_id=2770")[0][0], 20)
+        # a looted item that is not in the bags gets its name; the fuller bag info is never overwritten
+        self.assertEqual(q("SELECT name, class_id, stack_size FROM items WHERE item_id=4018")[0], ("Courser Eye", 15, 20))
+        self.assertEqual(q("SELECT name FROM items WHERE item_id=2770")[0][0], "Copper Ore")
+        self.assertEqual(q("SELECT advice_time FROM advice_runs")[0][0], "2026-11-14 16:00:00")
+        self.assertEqual(q("SELECT action, keep_qty, sell_qty, unit, bound FROM advice_items WHERE item_id=2589")[0], ("sell_ah", 20, 32, 27, 1))
+        self.assertEqual(q("PRAGMA foreign_key_check"), [])
+
+    def test_migrates_a_database_made_before_v048(self):
+        old = sqlite3.connect(self.db)
+        old.executescript("""
+            CREATE TABLE items (item_id INTEGER PRIMARY KEY, name TEXT, quality INTEGER, item_level INTEGER,
+                min_level INTEGER, type TEXT, subtype TEXT, class_id INTEGER, subclass_id INTEGER,
+                vendor_sell_price INTEGER, is_reagent INTEGER, bind_type INTEGER);
+            CREATE TABLE recipes (run_id INTEGER NOT NULL, recipe_id INTEGER NOT NULL, profession TEXT NOT NULL,
+                name TEXT, learned INTEGER, category_id INTEGER, output_item_id INTEGER, PRIMARY KEY (run_id, recipe_id));
+            INSERT INTO items (item_id, name) VALUES (1, 'Kept from the old database');
+        """)
+        old.commit()
+        old.close()
+        c = self.ingest(self.v048())
+        cols = lambda t: {r[1] for r in c.execute(f"PRAGMA table_info({t})")}
+        self.assertTrue({"stack_size"} <= cols("items"))
+        self.assertTrue({"difficulty", "trivial_level", "can_skill_up", "out_min", "out_max"} <= cols("recipes"))
+        self.assertEqual(c.execute("SELECT name FROM items WHERE item_id=1").fetchone()[0], "Kept from the old database")
+        self.assertEqual(c.execute("SELECT out_max FROM recipes WHERE recipe_id=2657").fetchone()[0], 3)
+
     def test_view_counts_learned_and_unlearned_recipes(self):
         c = self.ingest(self.make_run("run-a"))
         row = c.execute("SELECT learned_recipes, unlearned_recipes FROM v_bag_advice WHERE name='Copper Ore'").fetchone()

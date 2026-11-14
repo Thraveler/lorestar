@@ -15,6 +15,7 @@ local GRID = 50             -- cells per map axis (each cell is 2% of the map)
 local MAX_KEYS = 4000       -- distinct (map, cell, source) records kept
 local MAX_ITEMS = 80        -- distinct items kept per record
 local MAX_SAMPLES = 8       -- API-shape samples kept for the probe report
+local MAX_NAMES = 3000      -- distinct looted items whose name and facts are remembered
 
 local frame = CreateFrame("Frame")
 
@@ -41,6 +42,8 @@ local function store()
     l.agg = l.agg or {}           -- ["map|cx|cy|source"] = { opens = n, items = { [itemID] = qty } }
     l.zones = l.zones or {}       -- [mapID] = zone name
     l.sub = l.sub or {}           -- ["map|cx|cy"] = subzone name
+    l.names = l.names or {}       -- [itemID] = { n = name, q = quality, s = sell price, c = classID, st = stack size }
+    l.nNames = l.nNames or 0
     l.probe = l.probe or {}
     local p = l.probe
     p.opens = p.opens or 0        -- loot windows seen
@@ -87,6 +90,22 @@ local function currentPlace()
     if type(mapID) ~= "number" or isSecret(mapID) then mapID = nil end
     if type(x) ~= "number" or type(y) ~= "number" or isSecret(x) or isSecret(y) then x, y = nil, nil end
     return mapID, x, y
+end
+
+-- Remembers the name and facts of a looted item the first time it is seen, so the
+-- viewer never has to show a bare item ID. The link carries the name even when the
+-- item is not cached yet; GetItemInfo adds quality, sell price and class when it is.
+local function rememberItem(l, itemID, link)
+    if l.names[itemID] or l.nNames >= MAX_NAMES then return end
+    local entry = { n = link:match("|h%[(.-)%]|h") }
+    local ok, name, _, quality, _, _, _, _, stack, _, _, sell, classID = pcall(C_Item.GetItemInfo, link)
+    if ok and type(name) == "string" and not isSecret(name) then
+        entry.n, entry.q, entry.s, entry.c, entry.st = name, quality, sell, classID, stack
+    end
+    if entry.n and not isSecret(entry.n) then
+        l.names[itemID] = entry
+        l.nNames = l.nNames + 1
+    end
 end
 
 -- Which source a loot slot came from: the first GUID GetLootSourceInfo reports.
@@ -141,6 +160,7 @@ local function onLootOpened()
         pcall(function() link = GetLootSlotLink and GetLootSlotLink(slot) end)
         if type(link) == "string" and not isSecret(link) then
             local itemID = tonumber(link:match("item:(%d+)"))
+            if itemID then rememberItem(l, itemID, link) end
             local okI, _, _, qty = pcall(GetLootSlotInfo, slot)
             if not okI or type(qty) ~= "number" or isSecret(qty) then qty = 1 end
             local source = slotSource(slot, sample)

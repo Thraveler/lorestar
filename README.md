@@ -1,8 +1,9 @@
 # Lorestar
 
 A bag and profession advisor for **WoW Forever** (Midnight Retail client, interface 16001).
-For each item in your bags it aims to recommend keep, sell on the Auction House, vendor or discard,
-based on your professions, the recipes you know, Auction House prices and your free bag space.
+For each item in your bags it recommends keep, sell on the Auction House, vendor, discard or review,
+based on the recipes you know, Auction House prices and your free bag space. The advice is available in game
+(`/lorestar advise`) and in the web viewer, which runs the same rules.
 
 Lorestar only **reads** data and recommends. It never sells, buys, posts or acts for you.
 

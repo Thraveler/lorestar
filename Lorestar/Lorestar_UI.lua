@@ -173,6 +173,14 @@ local function buildPanel()
         "Names of reagents and crafted items. Run it after dumping recipes.")
     row(btnRecipes, btnNames)
 
+    if ns.advisor then
+        heading("Advisor")
+        local btnAdvise = makeButton(f, "Advise: what to do with my bags", PANEL_W - PAD * 2, function() ns.advisor.report() end,
+            "Recommends keep, sell on the AH, vendor, discard or review for each item in your bags. It only recommends; it never sells or moves anything.")
+        btnAdvise.noMark = false
+        row(btnAdvise)
+    end
+
     heading("Auction House")
     local btnScan = makeButton(f, "Scan AH prices", PANEL_W - PAD * 2, function() a.scan() end,
         "With the Auction House open, record prices. The game allows about one scan every 15 minutes.")

@@ -1,0 +1,646 @@
+{
+  "_comment": "Shared test cases for the rules engine. Both Lorestar/Lorestar_Advisor.lua and web/src/lib/rules.ts must produce these results. Prices are copper per unit. Defaults: ahCut 0.05, ahRatio 1.5, minGainPerItem 2, minListings 3, craftsToKeep 10, saturation 0.25, lowFreeSlots 4, maxSpread 4.",
+  "cases": [
+    {
+      "name": "quest items are always kept",
+      "item": {
+        "id": 100,
+        "qty": 1,
+        "quality": 1,
+        "classID": 12,
+        "vendor": 0
+      },
+      "ctx": {
+        "freeSlots": 2
+      },
+      "expect": {
+        "action": "keep",
+        "keepQty": 1,
+        "sellQty": 0,
+        "unit": 0,
+        "total": 0,
+        "reason": "quest",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "the keep list wins over everything (Hearthstone)",
+      "item": {
+        "id": 6948,
+        "qty": 1,
+        "quality": 1,
+        "classID": 15,
+        "vendor": 0,
+        "bound": true
+      },
+      "ctx": {
+        "freeSlots": 0
+      },
+      "expect": {
+        "action": "keep",
+        "keepQty": 1,
+        "sellQty": 0,
+        "reason": "keep_list",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "recipe books are left to the player to decide",
+      "item": {
+        "id": 101,
+        "qty": 1,
+        "quality": 1,
+        "classID": 9,
+        "vendor": 0
+      },
+      "ctx": {
+        "freeSlots": 10
+      },
+      "expect": {
+        "action": "review",
+        "keepQty": 1,
+        "sellQty": 0,
+        "reason": "recipe_item",
+        "confidence": "medium"
+      }
+    },
+    {
+      "name": "all of it is kept when a learned recipe needs it (Copper Ore)",
+      "item": {
+        "id": 2770,
+        "qty": 6,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 5,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 125,
+          "p10": 109,
+          "m": 105,
+          "n": 244,
+          "q": 7000
+        },
+        "recipes": {
+          "learnedCount": 1,
+          "learnedMax": 1,
+          "unlearnedCount": 0
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "keep",
+        "keepQty": 6,
+        "sellQty": 0,
+        "reason": "reagent_learned",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "keeps enough for 10 crafts and sells the surplus on the AH (Linen Cloth)",
+      "item": {
+        "id": 2589,
+        "qty": 52,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 13,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 29,
+          "p10": 25,
+          "m": 18,
+          "n": 622,
+          "q": 19000
+        },
+        "recipes": {
+          "learnedCount": 5,
+          "learnedMax": 2,
+          "unlearnedCount": 0
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "sell_ah",
+        "keepQty": 20,
+        "sellQty": 32,
+        "unit": 27,
+        "total": 864,
+        "reason": "ah_better",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "the vendor wins when the AH barely pays more (Heavy Linen Bandage)",
+      "item": {
+        "id": 3530,
+        "qty": 1,
+        "quality": 1,
+        "classID": 0,
+        "vendor": 20,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 20,
+          "p10": 20,
+          "m": 20,
+          "n": 665,
+          "q": 5000
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "vendor",
+        "keepQty": 0,
+        "sellQty": 1,
+        "unit": 20,
+        "total": 20,
+        "reason": "vendor_better",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "a thin market lowers the confidence",
+      "item": {
+        "id": 200,
+        "qty": 4,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 5,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 100,
+          "p10": 100,
+          "m": 100,
+          "n": 2,
+          "q": 40
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "sell_ah",
+        "sellQty": 4,
+        "unit": 95,
+        "total": 380,
+        "reason": "ah_better",
+        "confidence": "low",
+        "notesInclude": [
+          "thin_market"
+        ]
+      }
+    },
+    {
+      "name": "holding a big share of the market lowers the confidence (saturation)",
+      "item": {
+        "id": 201,
+        "qty": 50,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 5,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 100,
+          "p10": 90,
+          "m": 80,
+          "n": 20,
+          "q": 100
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "sell_ah",
+        "sellQty": 50,
+        "unit": 95,
+        "total": 4750,
+        "reason": "ah_better",
+        "confidence": "medium",
+        "notesInclude": [
+          "saturation"
+        ]
+      }
+    },
+    {
+      "name": "without AH data the vendor price is used",
+      "item": {
+        "id": 202,
+        "qty": 1,
+        "quality": 2,
+        "classID": 2,
+        "vendor": 1697,
+        "stack": 1
+      },
+      "ctx": {
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "vendor",
+        "sellQty": 1,
+        "unit": 1697,
+        "total": 1697,
+        "reason": "vendor_only",
+        "confidence": "high",
+        "notesInclude": [
+          "check_upgrade"
+        ]
+      }
+    },
+    {
+      "name": "no value and a full bag means discard",
+      "item": {
+        "id": 203,
+        "qty": 12,
+        "quality": 1,
+        "classID": 15,
+        "vendor": 0,
+        "stack": 20
+      },
+      "ctx": {
+        "freeSlots": 2
+      },
+      "expect": {
+        "action": "discard",
+        "sellQty": 12,
+        "unit": 0,
+        "total": 0,
+        "reason": "no_value",
+        "confidence": "medium"
+      }
+    },
+    {
+      "name": "no value with room in the bags is left for review",
+      "item": {
+        "id": 203,
+        "qty": 12,
+        "quality": 1,
+        "classID": 15,
+        "vendor": 0,
+        "stack": 20
+      },
+      "ctx": {
+        "freeSlots": 20
+      },
+      "expect": {
+        "action": "review",
+        "sellQty": 12,
+        "reason": "no_value",
+        "confidence": "medium"
+      }
+    },
+    {
+      "name": "bound items cannot go to the AH: vendor only",
+      "item": {
+        "id": 204,
+        "qty": 1,
+        "quality": 3,
+        "classID": 4,
+        "vendor": 895,
+        "stack": 1,
+        "bound": true
+      },
+      "ctx": {
+        "price": {
+          "med": 5000,
+          "p10": 4800,
+          "m": 4500,
+          "n": 12,
+          "q": 12
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "vendor",
+        "sellQty": 1,
+        "unit": 895,
+        "total": 895,
+        "reason": "bound_vendor",
+        "confidence": "high",
+        "notesInclude": [
+          "check_upgrade"
+        ]
+      }
+    },
+    {
+      "name": "the vendor pays nothing but the AH has a price",
+      "item": {
+        "id": 205,
+        "qty": 3,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 0,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 400,
+          "p10": 390,
+          "m": 380,
+          "n": 10,
+          "q": 100
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "sell_ah",
+        "sellQty": 3,
+        "unit": 380,
+        "total": 1140,
+        "reason": "ah_only",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "a reagent only used by unlearned recipes is priced like any other item",
+      "item": {
+        "id": 3,
+        "qty": 7,
+        "quality": 1,
+        "classID": 0,
+        "vendor": 6,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 69,
+          "p10": 45,
+          "m": 45,
+          "n": 84,
+          "q": 900
+        },
+        "recipes": {
+          "learnedCount": 0,
+          "learnedMax": 0,
+          "unlearnedCount": 5
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "sell_ah",
+        "keepQty": 0,
+        "sellQty": 7,
+        "unit": 65,
+        "total": 455,
+        "reason": "ah_better",
+        "confidence": "high",
+        "notesInclude": [
+          "unlearned_recipes"
+        ]
+      }
+    },
+    {
+      "name": "a higher AH cut changes the verdict",
+      "item": {
+        "id": 206,
+        "qty": 2,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 60,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 100,
+          "p10": 100,
+          "m": 100,
+          "n": 20,
+          "q": 500
+        },
+        "freeSlots": 6
+      },
+      "cfg": {
+        "ahCut": 0.5
+      },
+      "expect": {
+        "action": "vendor",
+        "sellQty": 2,
+        "unit": 60,
+        "total": 120,
+        "reason": "vendor_better",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "a partial keep with the surplus going to the vendor",
+      "item": {
+        "id": 207,
+        "qty": 35,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 10,
+        "stack": 20
+      },
+      "ctx": {
+        "recipes": {
+          "learnedCount": 2,
+          "learnedMax": 3,
+          "unlearnedCount": 0
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "vendor",
+        "keepQty": 30,
+        "sellQty": 5,
+        "unit": 10,
+        "total": 50,
+        "reason": "vendor_only",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "a gain under the minimum is not worth the AH",
+      "item": {
+        "id": 208,
+        "qty": 10,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 1,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 2,
+          "p10": 2,
+          "m": 2,
+          "n": 50,
+          "q": 1000
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "vendor",
+        "sellQty": 10,
+        "unit": 1,
+        "total": 10,
+        "reason": "vendor_better",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "the number of crafts to keep is configurable",
+      "item": {
+        "id": 2589,
+        "qty": 52,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 13,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 29,
+          "p10": 25,
+          "m": 18,
+          "n": 622,
+          "q": 19000
+        },
+        "recipes": {
+          "learnedCount": 5,
+          "learnedMax": 2,
+          "unlearnedCount": 0
+        },
+        "freeSlots": 6
+      },
+      "cfg": {
+        "craftsToKeep": 30
+      },
+      "expect": {
+        "action": "keep",
+        "keepQty": 52,
+        "sellQty": 0,
+        "reason": "reagent_learned",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "no value but used by unlearned recipes is reviewed, never discarded",
+      "item": {
+        "id": 209,
+        "qty": 3,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 0,
+        "stack": 20
+      },
+      "ctx": {
+        "recipes": {
+          "learnedCount": 0,
+          "learnedMax": 0,
+          "unlearnedCount": 2
+        },
+        "freeSlots": 1
+      },
+      "expect": {
+        "action": "review",
+        "sellQty": 3,
+        "reason": "no_value",
+        "confidence": "medium",
+        "notesInclude": [
+          "unlearned_recipes"
+        ]
+      }
+    },
+    {
+      "name": "a median far above the cheap end is not trusted: the p10 is used (Longjaw Mud Snapper)",
+      "item": {
+        "id": 6289,
+        "qty": 10,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 1,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 2200,
+          "p10": 8,
+          "m": 5,
+          "n": 249,
+          "q": 11610
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "sell_ah",
+        "sellQty": 10,
+        "unit": 7,
+        "total": 70,
+        "reason": "ah_better",
+        "confidence": "low",
+        "notesInclude": [
+          "wide_spread"
+        ]
+      }
+    },
+    {
+      "name": "a spread just under the limit keeps the median",
+      "item": {
+        "id": 6290,
+        "qty": 2,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 5,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 400,
+          "p10": 100,
+          "m": 90,
+          "n": 50,
+          "q": 900
+        },
+        "freeSlots": 6
+      },
+      "expect": {
+        "action": "sell_ah",
+        "sellQty": 2,
+        "unit": 380,
+        "total": 760,
+        "reason": "ah_better",
+        "confidence": "high"
+      }
+    },
+    {
+      "name": "the spread limit is configurable",
+      "item": {
+        "id": 6291,
+        "qty": 2,
+        "quality": 1,
+        "classID": 7,
+        "vendor": 5,
+        "stack": 20
+      },
+      "ctx": {
+        "price": {
+          "med": 400,
+          "p10": 100,
+          "m": 90,
+          "n": 50,
+          "q": 900
+        },
+        "freeSlots": 6
+      },
+      "cfg": {
+        "maxSpread": 2
+      },
+      "expect": {
+        "action": "sell_ah",
+        "sellQty": 2,
+        "unit": 95,
+        "total": 190,
+        "reason": "ah_better",
+        "confidence": "low",
+        "notesInclude": [
+          "wide_spread"
+        ]
+      }
+    }
+  ]
+}

@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS items (          -- latest known info per item (bag i
     subclass_id       INTEGER,
     vendor_sell_price INTEGER,
     is_reagent        INTEGER,
-    bind_type         INTEGER
+    bind_type         INTEGER,
+    stack_size        INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS bag_items (
@@ -53,6 +54,11 @@ CREATE TABLE IF NOT EXISTS recipes (
     learned        INTEGER,
     category_id    INTEGER,
     output_item_id INTEGER,
+    difficulty     INTEGER,      -- relativeDifficulty (addon v0.4.8): 0 optimal, 1 medium, 2 easy, 3 trivial
+    trivial_level  INTEGER,      -- skill at which the recipe stops giving skill points
+    can_skill_up   INTEGER,
+    out_min        INTEGER,      -- units made per craft
+    out_max        INTEGER,
     PRIMARY KEY (run_id, recipe_id)
 );
 
@@ -116,6 +122,26 @@ CREATE TABLE IF NOT EXISTS loot_probe (
     secret      INTEGER,
     errors      INTEGER,
     dropped     INTEGER
+);
+
+-- What the in-game advisor recommended (addon v0.4.8), kept to compare with the web engine.
+CREATE TABLE IF NOT EXISTS advice_runs (
+    run_id     INTEGER PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
+    advice_time TEXT,
+    price_time  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS advice_items (
+    run_id     INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    item_id    INTEGER NOT NULL,
+    action     TEXT,
+    keep_qty   INTEGER,
+    sell_qty   INTEGER,
+    unit       INTEGER,
+    reason     TEXT,
+    confidence TEXT,
+    bound      INTEGER,
+    PRIMARY KEY (run_id, item_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_reagents_item ON recipe_reagents(item_id);

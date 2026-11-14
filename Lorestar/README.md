@@ -15,13 +15,14 @@ network access.
    Forever's `Interface/AddOns/` directory. The folder must be named exactly `Lorestar`.
 2. If you used the old ForeverProbe, delete its folder first. You can also delete
    `ForeverProbe.lua` in `WTF/Account/<account>/SavedVariables/`.
-3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.7`.
+3. Log in or `/reload`. You should see `Lorestar: loaded v0.4.8`.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `/lorestar` | Show help |
+| `/lorestar advise [all]` | Recommend what to do with each item in your bags (never acts) |
 | `/lorestar ui` | Open the panel (or click the minimap button) |
 | `/lorestar loot on\|off\|status\|clear` | Record what you loot and where (aggregated, off by default) |
 | `/lorestar minimap show\|hide` | Show or hide the minimap button |
@@ -56,6 +57,16 @@ After any command, `/reload` (or logging out) writes the data to disk.
    material such as ore, and a piece of gear). Also loot, mine, craft and visit a vendor.
    Then `/lorestar events off`.
 5. `/reload`.
+
+## What's new in 0.4.8
+
+- **Advisor** (`Lorestar_Advisor.lua`): `/lorestar advise` (or the **Advise** button in the panel) recommends, for each item in your bags, **keep**, **sell on the AH**, **vendor**, **discard** or **review**, with the reason and how much it is worth. It only recommends: it never sells, posts, destroys or moves anything. `/lorestar advise all` also lists what to keep.
+  - It uses your bags right now, the prices of your last Auction House scan (`Scan AH prices`) and the recipes you dumped (`Dump recipes`), so run those first. It warns when recipes are missing or the scan is old.
+  - Rules in short: quest items and the Hearthstone are kept; reagents of recipes you know are kept for 10 crafts and the rest is sold; the AH is chosen only when it pays at least 1.5x the vendor after the 5% cut; bound items go to the vendor; a median far above the cheap end of the market is not trusted (the p10 is used); worthless items are discarded only when the bags are nearly full, otherwise left for review.
+  - The advice is saved (`/reload`) so the web viewer can show it and compare it with its own engine.
+- Loot probe: remembers the name, quality, sell price and class of each item the first time you loot it, so the viewer never shows a bare item ID.
+- Recipes: `dump recipes` also records the skill difficulty, the skill at which a recipe stops giving points, whether it can still raise your skill, and how many units a craft makes.
+- Scans store an epoch timestamp (`ts`) so the advisor can tell how old the prices are.
 
 ## What's new in 0.4.7
 
