@@ -3,7 +3,15 @@ name: CI
 on:
   push:
     branches: [main]
+    # Documentation-only changes do not need a test run.
+    paths-ignore: ['*.md', '**/*.md']
   pull_request:
+    paths-ignore: ['*.md', '**/*.md']
+
+# A newer push to the same branch cancels the run still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -27,6 +35,8 @@ jobs:
           name: Lorestar-addon
           path: dist/Lorestar-v*.zip
           if-no-files-found: error
+          # Short on purpose: changes are frequent and old zips are not useful (the default is 90 days).
+          retention-days: 7
 
   web:
     runs-on: ubuntu-latest
